@@ -122,6 +122,15 @@ test('adding and editing habits trims names, preserves records, and rejects inva
   assert.throws(() => updateHabit(initial, 'unknown', { name: 'New', color: 'blue' }), /no longer exists/);
 });
 
+test('new habit identifiers contain sixteen random bytes and are unique', () => {
+  const state = createInitialState();
+  const first = addHabit(state, { name: 'Walk', color: 'sage' }).habits.at(-1).id;
+  const second = addHabit(state, { name: 'Water', color: 'teal' }).habits.at(-1).id;
+  assert.match(first, /^[0-9a-f]{32}$/);
+  assert.match(second, /^[0-9a-f]{32}$/);
+  assert.notEqual(first, second);
+});
+
 test('deleting a habit removes all its history and preserves unrelated records', () => {
   let state = toggleCompletion(createInitialState(), 'reading', '2026-10-20');
   state = toggleCompletion(state, 'reading', '2026-11-03');

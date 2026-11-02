@@ -138,7 +138,10 @@ export function toggleCompletion(state, habitId, dateKey) {
   return { ...state, completions };
 }
 
-export function addHabit(state, values, id = globalThis.crypto.randomUUID()) {
+const createHabitId = () => Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),
+  byte => byte.toString(16).padStart(2, '0')).join('');
+
+export function addHabit(state, values, id = createHabitId()) {
   const habit = normalizeHabit(state, values);
   if (!validId(id) || state.habits.some(item => item.id === id)) {
     throw new TypeError('The habit identifier is invalid or already exists.');
