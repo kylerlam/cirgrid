@@ -16,6 +16,7 @@ Before submitting a UI change, verify the real app at desktop and mobile widths:
 
 - Toggle a grid cell and a circular segment; verify both views agree after a reload.
 - Move to another week and return; existing check-ins must stay on their original dates.
+- On localhost or HTTPS, edit different habits in two tabs concurrently; both changes must survive and both views must converge.
 - Add and edit a habit; changing a name or color must retain its check-ins.
 - Cancel deletion, then confirm deletion; unrelated records must remain intact.
 - Check the empty state after deleting all habits and add a habit again.

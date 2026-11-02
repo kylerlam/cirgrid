@@ -26,20 +26,30 @@ function readSavedState() {
   }
 }
 
-function applyChange(nextState, message) {
+async function applyChange(transform, message) {
   if (!storageAvailable) {
     showError('Saved data could not be loaded. Reload after restoring browser storage; existing data has not been changed.');
     return false;
   }
   try {
-    saveState(window.localStorage, nextState);
-    state = nextState;
-    elements['storage-error'].hidden = true;
-    render();
-    elements.status.textContent = message;
-    return true;
+    const write = () => {
+      let current;
+      try { current = loadState(window.localStorage); }
+      catch (error) { storageAvailable = false; throw error; }
+      const nextState = transform(current);
+      saveState(window.localStorage, nextState);
+      state = nextState;
+      elements['storage-error'].hidden = true;
+      render();
+      elements.status.textContent = typeof message === 'function' ? message(nextState) : message;
+      return true;
+    };
+    return navigator.locks?.request
+      ? await navigator.locks.request('cirgrid-state-write', write)
+      : write();
   } catch (error) {
-    showError(error.message);
+    if (error instanceof TypeError || error instanceof RangeError) elements.status.textContent = error.message;
+    else showError(error.message);
     return false;
   }
 }
@@ -47,10 +57,11 @@ function applyChange(nextState, message) {
 const editor = createHabitEditor({ getState: () => state, onChange: applyChange });
 
 function toggle(habitId, dateKey) {
-  const habit = state.habits.find(item => item.id === habitId);
-  const next = toggleCompletion(state, habitId, dateKey);
-  const completed = next.completions[dateKey]?.[habitId] === true;
-  applyChange(next, habit.name + (completed ? ' checked in for ' : ' check-in removed for ') + dateKey + '.');
+  return applyChange(current => toggleCompletion(current, habitId, dateKey), next => {
+    const habit = next.habits.find(item => item.id === habitId);
+    const completed = next.completions[dateKey]?.[habitId] === true;
+    return habit.name + (completed ? ' checked in for ' : ' check-in removed for ') + dateKey + '.';
+  });
 }
 
 function renderHabits() {

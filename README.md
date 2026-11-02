@@ -50,6 +50,8 @@ If saved data is corrupt or browser storage is unavailable, CirGrid reports the 
 
 Changing the hostname, protocol, or port uses a different browser storage origin. Use a consistent URL for your personal records.
 
+On localhost and HTTPS, modern browsers use Web Locks to serialize changes from multiple tabs. On plain HTTP origins without Web Locks, use one tab at a time when editing records.
+
 ## Development
 
 The app uses HTML, CSS, and JavaScript ES modules, with no runtime dependencies.

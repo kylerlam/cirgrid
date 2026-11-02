@@ -31,8 +31,11 @@ export function createHabitEditor({ getState, onChange }) {
   const error = dialog.querySelector('.dialog-error');
   const submit = dialog.querySelector('button[type="submit"]');
   const remove = dialog.querySelector('[data-action="delete"]');
+  const cancel = dialog.querySelector('[data-action="cancel"]');
+  const dismiss = dialog.querySelector('.dialog-close');
   let editingId = null;
   let opener = null;
+  let saving = false;
 
   for (const color of HABIT_COLORS) {
     const label = document.createElement('label');
@@ -57,40 +60,64 @@ export function createHabitEditor({ getState, onChange }) {
   }
 
   function close() {
-    if (dialog.open) dialog.close();
+    if (!saving && dialog.open) dialog.close();
   }
 
-  function applyChange(nextState, successMessage) {
-    if (onChange(nextState, successMessage) === true) close();
-    else showError('Your changes could not be saved. Please try again.');
+  function setSaving(value) {
+    saving = value;
+    dialog.setAttribute('aria-busy', String(value));
+    for (const control of dialog.querySelectorAll('button, input')) control.disabled = value;
   }
 
-  dialog.querySelector('.habit-form').addEventListener('submit', event => {
-    event.preventDefault();
-    error.hidden = true;
-    const values = { name: input.value, color: dialog.querySelector('input[name="color"]:checked').value };
+  async function applyChange(transform, successMessage) {
+    if (saving) return;
+    const focusTarget = document.activeElement;
+    setSaving(true);
+    let saved = false;
+    let validationError = '';
     try {
-      const state = getState();
-      if (editingId === null) applyChange(addHabit(state, values), 'Habit added.');
-      else applyChange(updateHabit(state, editingId, values), 'Habit updated.');
+      saved = await onChange(current => {
+        try { return transform(current); }
+        catch (failure) { validationError = failure.message; throw failure; }
+      }, successMessage);
+      if (!saved) showError(validationError || 'Your changes could not be saved. Please try again.');
     } catch (failure) {
       showError(failure.message || 'Your changes could not be saved. Please try again.');
+    } finally {
+      setSaving(false);
     }
+    if (saved) close();
+    else if (dialog.contains(focusTarget)) focusTarget.focus({ preventScroll: true });
+  }
+
+  dialog.querySelector('.habit-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (saving) return;
+    error.hidden = true;
+    const habitId = editingId;
+    const values = { name: input.value, color: dialog.querySelector('input[name="color"]:checked').value };
+    await applyChange(current => habitId === null
+      ? addHabit(current, values)
+      : updateHabit(current, habitId, values), habitId === null ? 'Habit added.' : 'Habit updated.');
   });
 
-  remove.addEventListener('click', () => {
+  remove.addEventListener('click', async () => {
+    if (saving) return;
+    error.hidden = true;
+    const habitId = editingId;
     try {
-      const habit = getState().habits.find(item => item.id === editingId);
+      const habit = getState().habits.find(item => item.id === habitId);
       if (!habit) throw new Error('This habit no longer exists.');
       if (!window.confirm(`Delete "${habit.name}" and all of its check-ins? This cannot be undone.`)) return;
-      applyChange(deleteHabit(getState(), editingId), 'Habit deleted.');
+      await applyChange(current => deleteHabit(current, habitId), 'Habit deleted.');
     } catch (failure) {
       showError(failure.message || 'Your changes could not be saved. Please try again.');
     }
   });
 
-  dialog.querySelector('.dialog-close').addEventListener('click', close);
-  dialog.querySelector('[data-action="cancel"]').addEventListener('click', close);
+  dismiss.addEventListener('click', close);
+  cancel.addEventListener('click', close);
+  dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
   dialog.addEventListener('close', () => {
     const habitId = opener?.dataset?.editHabit;
     const replacement = habitId ? document.querySelector(`[data-edit-habit="${habitId}"]`) : null;
@@ -102,6 +129,7 @@ export function createHabitEditor({ getState, onChange }) {
 
   return {
     open(habitId) {
+      if (saving) return;
       const habit = habitId === undefined ? null : getState().habits.find(item => item.id === habitId);
       if (habitId !== undefined && !habit) throw new Error('This habit no longer exists.');
       editingId = habit?.id ?? null;
