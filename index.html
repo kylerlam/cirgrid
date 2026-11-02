@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#5c7664">
+  <meta name="description" content="Build daily habits with synchronized circular and grid trackers. Open source, with your records saved in your browser.">
+  <title>CirGrid — Habit tracker</title>
+  <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/src/styles.css">
+  <script type="module" src="/src/app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#tracker">Skip to tracker</a>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h1M13 15h1M8 18h1M13 18h1"/></symbol>
+    <symbol id="icon-left" viewBox="0 0 24 24"><path d="m14 6-6 6 6 6"/></symbol>
+    <symbol id="icon-right" viewBox="0 0 24 24"><path d="m10 6 6 6-6 6"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-edit" viewBox="0 0 24 24"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z"/></symbol>
+    <symbol id="icon-storage" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M7 15h5"/></symbol>
+    <symbol id="icon-github" viewBox="0 0 24 24"><path d="M9 19c-4.3 1.3-4.3-2.2-6-2.7M15 22v-3.4c0-1 .1-1.4-.5-2 3.3-.4 6.5-1.6 6.5-7.1a5.5 5.5 0 0 0-1.5-3.8 5 5 0 0 0-.1-3.7s-1.2-.4-3.9 1.5a13.5 13.5 0 0 0-7 0C5.8 1.6 4.6 2 4.6 2a5 5 0 0 0-.1 3.7A5.5 5.5 0 0 0 3 9.5c0 5.5 3.2 6.7 6.5 7.1-.6.6-.6 1.2-.5 2V22"/></symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+  </svg>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="Sidebar">
+      <a class="brand" href="/" aria-label="CirGrid home"><img src="/assets/icon.svg" alt="" width="36" height="36"><span>CirGrid</span></a>
+      <nav class="navigation" aria-label="Main navigation"><a class="nav-item is-active" href="#tracker" aria-current="page"><svg class="icon" aria-hidden="true"><use href="#icon-calendar"/></svg><span>Weekly tracker</span></a></nav>
+      <section class="sidebar-section" aria-labelledby="habits-heading"><h2 id="habits-heading">Habits</h2><div id="habit-list" class="habit-list"></div></section>
+      <div class="sidebar-footer"><span class="storage-note"><svg class="icon" aria-hidden="true"><use href="#icon-storage"/></svg>Saved in this browser</span><a class="source-link" href="https://github.com/kylerlam/cirgrid" target="_blank" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#icon-github"/></svg>GitHub</a></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar"><h1>Weekly tracker</h1><button id="new-habit" class="button button-primary" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg>New habit</button></header>
+      <main id="tracker" class="main-content">
+        <div id="storage-error" class="error-banner" role="alert" hidden></div>
+        <div class="week-toolbar">
+          <div class="week-navigation"><h2 id="week-range"></h2><div class="week-arrows"><button id="previous-week" class="button button-secondary icon-button" type="button" aria-label="Previous week"><svg class="icon" aria-hidden="true"><use href="#icon-left"/></svg></button><button id="next-week" class="button button-secondary icon-button" type="button" aria-label="Next week"><svg class="icon" aria-hidden="true"><use href="#icon-right"/></svg></button></div></div>
+          <div class="date-controls"><label class="sr-only" for="selected-date">Choose a date</label><input id="selected-date" class="date-input" type="date"><button id="today" class="button button-secondary" type="button">Today</button></div>
+        </div>
+        <div class="tracker-panels">
+          <section class="tracker-panel" aria-labelledby="circular-heading"><div class="panel-heading"><h2 id="circular-heading">Circular tracker</h2><p>One ring per habit</p></div><div id="circle-tracker"></div></section>
+          <section class="tracker-panel" aria-labelledby="grid-heading"><div class="panel-heading"><h2 id="grid-heading">Grid tracker</h2><p>One row per habit</p></div><div id="grid-tracker"></div></section>
+        </div>
+        <div class="tracker-key" aria-label="Completion key"><span><span class="key-cell is-complete"><svg class="icon" aria-hidden="true"><use href="#icon-check"/></svg></span>Completed</span><span><span class="key-cell"></span>Not checked in</span></div>
+        <p id="status" class="status-message" role="status" aria-live="polite"></p>
+      </main>
+    </div>
+  </div>
+  <noscript><p class="noscript-message">Enable JavaScript to use CirGrid.</p></noscript>
+</body>
+</html>
