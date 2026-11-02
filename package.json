@@ -5,11 +5,13 @@
   "description": "An open-source habit tracker with synchronized circular and grid views.",
   "type": "module",
   "license": "MIT",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node scripts/serve.js",
     "dev": "node scripts/serve.js",
     "test": "node --test",
-    "check": "node --check scripts/serve.js"
+    "check": "node scripts/check.js"
   }
 }
