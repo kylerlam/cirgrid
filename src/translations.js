@@ -1,5 +1,7 @@
 // Translation order: Spanish, Simplified Chinese, Traditional Chinese.
 export const translations = {
+  "Habit history": ["Historial de hábitos", "习惯历史", "習慣歷史"],
+  "Last 12 weeks. Select a day to open its week.": ["Últimas 12 semanas. Selecciona un día para ver su semana.", "最近 12 周。选择一天可查看该周。", "最近 12 週。選擇一天即可查看該週。"],
   "Settings": ["Configuración", "设置", "設定"],
   "Close": ["Cerrar", "关闭", "關閉"],
   "Language": ["Idioma", "语言", "語言"],

@@ -3,6 +3,7 @@ import {
   localDateKey, weekDates, shiftDate, formatWeekRange, toggleCompletion,
 } from './model.js';
 import { renderCircle, renderGrid } from './views.js';
+import { renderHistory } from './history.js';
 import { createHabitEditor } from './editor.js';
 import { request } from './api.js';
 import { applyPreferences, getLanguage, t } from './preferences.js';
@@ -10,7 +11,7 @@ import { createSettings } from './settings.js';
 
 const elements = Object.fromEntries(['habit-list', 'new-habit', 'week-range', 'previous-week', 'next-week',
   'selected-date', 'today', 'circle-tracker', 'grid-tracker', 'storage-error', 'status', 'migration-notice',
-  'migrate-browser', 'download-browser'].map(id => [id, document.getElementById(id)]));
+  'migrate-browser', 'download-browser', 'habit-history', 'history-habit'].map(id => [id, document.getElementById(id)]));
 let state = createInitialState();
 let revision = 0;
 let selectedDate = localDateKey();
@@ -126,6 +127,7 @@ function render() {
   renderHabits();
   renderCircle(elements['circle-tracker'], options);
   renderGrid(elements['grid-tracker'], options);
+  renderHistory(elements['habit-history'], { state, selectedDate, today, onSelectDate: jumpToWeek });
   if (focus) {
     const cell = [...document.querySelectorAll('[data-view]')].find(node => node.dataset.view === focus.view && node.dataset.habitId === focus.habitId && node.dataset.date === focus.date);
     cell?.focus({ preventScroll: true });
@@ -144,6 +146,13 @@ function selectDate(dateKey) {
     elements['selected-date'].value = selectedDate;
     elements.status.textContent = t(error.message);
   }
+}
+
+function jumpToWeek(dateKey) {
+  selectDate(dateKey);
+  const heading = elements['week-range'];
+  heading.focus({ preventScroll: true });
+  heading.scrollIntoView({ block: 'start' });
 }
 
 function shiftWeek(offset) {
@@ -279,6 +288,7 @@ async function start() {
   elements['next-week'].addEventListener('click', () => shiftWeek(7));
   elements['today'].addEventListener('click', () => selectDate(localDateKey()));
   elements['selected-date'].addEventListener('change', event => selectDate(event.target.value));
+  elements['history-habit'].addEventListener('change', render);
   window.addEventListener('languagechange', render);
   window.addEventListener('focus', refresh);
   changes?.addEventListener('message', refresh);
