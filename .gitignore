@@ -9,4 +9,13 @@ test-results/
 *.log
 
 __pycache__/
+
+# Private tracker databases and exports
 /data/
+cirgrid.sqlite3
+cirgrid.sqlite3-*
+cirgrid.json
+cirgrid.yml
+cirgrid-????-??-??.json
+cirgrid-????-??-??.yml
+cirgrid-browser-backup.json
