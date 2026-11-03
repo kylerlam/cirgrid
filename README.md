@@ -5,7 +5,7 @@ CirGrid is a private, open-source habit tracker with synchronized circular and g
 - Check in through either tracker and browse Monday-to-Sunday weeks.
 - Set a weekly target of 1–7 days for each habit. The default is 5. Changes apply to the current week and later weeks.
 - See each week's score and outcome. Make up missed check-ins in past weeks. The gold outline identifies a check-in added after its week ended.
-- Leave the end date blank for an ongoing habit. Set an end date to make it a stage, with optional goal text such as “55 kg → 53 kg”. The end date is the last eligible day. Earlier weeks remain available for review and makeup check-ins.
+- Leave the end date blank for an ongoing habit. Set an end date to make it a stage, with optional goal text such as “55 kg → 53 kg”. The end date is the last eligible day. The stage disappears from the current tracker the following day, and its past weeks remain available for review and makeup check-ins.
 - Pick a preset or custom habit color. Choose from ten Daily Todo themes and switch among English, Spanish, Simplified Chinese, and Traditional Chinese. Theme and language are saved per browser.
 - Sign in on desktop or mobile to use the same saved habits and check-ins.
 

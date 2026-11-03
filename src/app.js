@@ -248,6 +248,15 @@ function refresh() {
   }).catch(reportFailure);
 }
 
+function refreshAtMidnight() {
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0);
+  setTimeout(() => {
+    render();
+    refreshAtMidnight();
+  }, midnight.getTime() - Date.now());
+}
+
 async function start() {
   applyPreferences();
   const session = await request('/api/session');
@@ -276,6 +285,7 @@ async function start() {
   document.getElementById('app-shell').hidden = false;
   accept(snapshot);
   offerBrowserMigration();
+  refreshAtMidnight();
 }
 
 start().catch(error => {

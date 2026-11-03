@@ -30,9 +30,12 @@ function cellAttributes(node, view, habit, dateKey, { completed, late, canMakeUp
   node.setAttribute('aria-pressed', String(completed));
 }
 
-function habitsForWeek(state, dates) {
-  return state.habits.filter(habit => isHabitActive(habit, dates[0])
-    || dates.some(date => isCompleted(state, habit.id, date)));
+function habitsForWeek(state, dates, today) {
+  const pastWeek = dates.at(-1) < today;
+  return state.habits.filter(habit => {
+    if (!pastWeek && !isHabitActive(habit, today)) return false;
+    return isHabitActive(habit, dates[0]) || dates.some(date => isCompleted(state, habit.id, date));
+  });
 }
 
 function checkMark(x, y, size) {
@@ -47,7 +50,7 @@ export function renderCircle(container, { state, dates, selectedDate, today, onT
   circleObservers.get(container)?.disconnect();
   container.classList.add('circular-view');
   container.replaceChildren();
-  const habits = habitsForWeek(state, dates);
+  const habits = habitsForWeek(state, dates, today);
   if (!habits.length) {
     container.append(element('p', 'chart-empty', t(state.habits.length ? 'No active habits this week.' : 'Add a habit to start your week.')));
     return;
@@ -184,7 +187,7 @@ export function renderCircle(container, { state, dates, selectedDate, today, onT
 export function renderGrid(container, { state, dates, selectedDate, today, onToggle }) {
   container.classList.add('grid-view');
   container.replaceChildren();
-  const habits = habitsForWeek(state, dates);
+  const habits = habitsForWeek(state, dates, today);
   if (!habits.length) {
     container.append(element('p', 'chart-empty', t(state.habits.length ? 'No active habits this week.' : 'Add a habit to start your week.')));
     return;
