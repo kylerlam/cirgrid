@@ -9,8 +9,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "start": "node scripts/serve.js",
-    "dev": "node scripts/serve.js",
+    "start": "python3 server.py",
+    "dev": "python3 server.py",
     "test": "node --test",
     "check": "node scripts/check.js"
   }

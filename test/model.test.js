@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
-  STORAGE_KEY, HABIT_COLORS, localDateKey, parseDateKey, shiftDate, weekDates,
-  formatWeekRange, createInitialState, validateState, isCompleted,
-  toggleCompletion, addHabit, updateHabit, deleteHabit, loadState, saveState,
+  HABIT_COLORS, localDateKey, parseDateKey, shiftDate, weekDates,
+  formatWeekRange, createInitialState, validateState, isCompleted, isLateCompletion,
+  toggleCompletion, addHabit, updateHabit, deleteHabit,
+  habitColor, isHabitActive, migrateState, weeklyGoal, weeklyProgress,
 } from '../src/model.js';
 
 function frozen(value) {
@@ -13,15 +14,6 @@ function frozen(value) {
     if (child && typeof child === 'object') frozen(child);
   }
   return value;
-}
-
-function memoryStorage(value = null) {
-  return {
-    value,
-    writes: 0,
-    getItem(key) { assert.equal(key, STORAGE_KEY); return this.value; },
-    setItem(key, next) { assert.equal(key, STORAGE_KEY); this.value = next; this.writes++; },
-  };
 }
 
 test('calendar helpers keep local dates and Monday-to-Sunday weeks across a year boundary', () => {
@@ -88,10 +80,10 @@ test('initial data has three named habits and no fabricated completions', () => 
 
 test('completion toggles are immutable and remove an empty day without disturbing another habit', () => {
   const before = frozen(createInitialState());
-  const completed = toggleCompletion(before, 'reading', '2026-11-03');
+  const completed = toggleCompletion(before, 'reading', '2026-11-03', '2026-11-04');
   assert.equal(isCompleted(before, 'reading', '2026-11-03'), false);
   assert.equal(isCompleted(completed, 'reading', '2026-11-03'), true);
-  const two = toggleCompletion(frozen(completed), 'exercise', '2026-11-03');
+  const two = toggleCompletion(frozen(completed), 'exercise', '2026-11-03', '2026-11-08');
   const one = toggleCompletion(frozen(two), 'reading', '2026-11-03');
   assert.deepEqual(one.completions, { '2026-11-03': { exercise: true } });
   const none = toggleCompletion(frozen(one), 'exercise', '2026-11-03');
@@ -134,7 +126,7 @@ test('new habit identifiers contain sixteen random bytes and are unique', () => 
 test('deleting a habit removes all its history and preserves unrelated records', () => {
   let state = toggleCompletion(createInitialState(), 'reading', '2026-10-20');
   state = toggleCompletion(state, 'reading', '2026-11-03');
-  state = frozen(toggleCompletion(state, 'exercise', '2026-11-03'));
+  state = frozen(toggleCompletion(state, 'exercise', '2026-11-03', '2026-11-03'));
   const result = deleteHabit(state, 'reading');
   assert.equal(result.habits.some(habit => habit.id === 'reading'), false);
   assert.deepEqual(result.completions, { '2026-11-03': { exercise: true } });
@@ -147,42 +139,83 @@ test('deleting a habit removes all its history and preserves unrelated records',
 test('schema validation rejects unsupported versions, duplicate identities, malformed dates, and orphan records', () => {
   const invalid = [];
   const changed = mutate => { const state = createInitialState(); mutate(state); invalid.push(state); };
-  changed(state => { state.version = 2; });
+  changed(state => { state.version = 3; });
   changed(state => { state.extra = true; });
   changed(state => { state.habits[1].id = 'sunscreen'; });
   changed(state => { state.habits[1].name = 'reading'; });
   changed(state => { state.habits[0].name = ' Sunscreen'; });
   changed(state => { state.habits[0].id = 'constructor'; });
   changed(state => { state.habits[0].color = 'red'; });
+  changed(state => { state.habits[0].weeklyGoals['2026-11-03'] = 3; });
+  changed(state => { state.habits[0].weeklyGoals['2026-11-02'] = 8; });
+  changed(state => { delete state.habits[0].weeklyGoals['0001-01-01']; });
+  changed(state => { state.habits[0].endDate = '2026-02-29'; });
+  changed(state => { state.habits[0].stageGoal = 'Goal without an end date'; });
   changed(state => { state.completions['2026-02-29'] = { reading: true }; });
   changed(state => { state.completions['2026-11-03'] = { unknown: true }; });
   changed(state => { state.completions['2026-11-03'] = { reading: false }; });
   changed(state => { state.completions['2026-11-03'] = {}; });
   for (const state of [null, [], {}, ...invalid]) assert.equal(validateState(state), false);
-  assert.equal(validateState({ version: 1, habits: [], completions: {} }), true);
+  assert.equal(validateState({ version: 2, habits: [], completions: {} }), true);
+  assert.throws(() => migrateState({ version: 99 }), /unsupported version/);
 });
 
-test('storage loads fresh data without writing, then persists and reloads real records', () => {
-  const storage = memoryStorage();
-  const initial = loadState(storage);
-  assert.equal(storage.writes, 0);
-  const state = toggleCompletion(initial, 'reading', '2026-11-03');
-  saveState(storage, state);
-  assert.equal(storage.writes, 1);
-  assert.deepEqual(loadState(storage), state);
+test('legacy browser records migrate without changing the source or guessing late status', () => {
+  const legacy = frozen({
+    version: 1,
+    habits: [{ id: 'reading', name: 'Reading', color: 'pink' }],
+    completions: { '2026-11-03': { reading: true } },
+  });
+  const raw = JSON.stringify(legacy);
+  const migrated = migrateState(legacy);
+  assert.equal(validateState(migrated), true);
+  assert.equal(weeklyGoal(migrated.habits[0], '2026-11-03'), 5);
+  assert.equal(isCompleted(migrated, 'reading', '2026-11-03'), true);
+  assert.equal(isLateCompletion(migrated, 'reading', '2026-11-03'), false);
+  assert.equal(JSON.stringify(legacy), raw);
 });
 
-test('corrupt and blocked storage report errors without replacing existing data', () => {
-  for (const raw of ['{broken', '{"version":99}', 'null']) {
-    const storage = memoryStorage(raw);
-    assert.throws(() => loadState(storage), /existing data has not been changed/);
-    assert.equal(storage.value, raw);
-    assert.equal(storage.writes, 0);
-  }
-  assert.throws(() => loadState({ getItem() { throw new Error('blocked'); } }), /storage is unavailable/);
-  assert.throws(() => saveState({ setItem() { throw new Error('quota'); } }, createInitialState()), /could not be saved/);
-  const storage = memoryStorage('untouched');
-  assert.throws(() => saveState(storage, { version: 99 }), /Invalid habit data/);
-  assert.equal(storage.value, 'untouched');
-  assert.equal(storage.writes, 0);
+test('weekly targets change during the current week without altering earlier weeks', () => {
+  const initial = createInitialState();
+  const values = { name: 'Reading', color: '#E85761', weeklyGoal: 3 };
+  const changed = updateHabit(initial, 'reading', values, '2026-11-05');
+  const habit = changed.habits.at(-1);
+  assert.equal(habitColor(habit).value, '#e85761');
+  assert.equal(weeklyGoal(habit, '2026-11-01'), 5);
+  assert.equal(weeklyGoal(habit, '2026-11-02'), 3);
+  assert.equal(weeklyGoal(habit, '2026-11-09'), 3);
+  assert.equal(validateState(changed), true);
+  assert.throws(() => updateHabit(changed, 'reading', { ...values, weeklyGoal: 0 }), TypeError);
+  const added = addHabit(changed, { name: 'Water', color: 'sage', weeklyGoal: 7 }, 'water');
+  assert.equal(weeklyGoal(added.habits.at(-1), '2026-11-05'), 7);
+});
+
+test('a missed week recovers when a late check-in reaches the original goal', () => {
+  const dates = weekDates('2026-11-03');
+  let state = addHabit(createInitialState(), { name: 'Walk', color: 'teal', weeklyGoal: 2 }, 'walk');
+  state = toggleCompletion(state, 'walk', dates[0], dates.at(-1));
+  const habit = state.habits.at(-1);
+  assert.equal(isLateCompletion(state, 'walk', dates[0]), false);
+  assert.deepEqual(weeklyProgress(state, habit, dates, '2026-11-08'), { completed: 1, goal: 2, status: 'pending' });
+  assert.deepEqual(weeklyProgress(state, habit, dates, '2026-11-09'), { completed: 1, goal: 2, status: 'missed' });
+  state = toggleCompletion(state, 'walk', dates[1], '2026-11-09');
+  assert.equal(isCompleted(state, 'walk', dates[1]), true);
+  assert.equal(isLateCompletion(state, 'walk', dates[1]), true);
+  assert.deepEqual(weeklyProgress(state, habit, dates, '2026-11-09'), { completed: 2, goal: 2, status: 'met' });
+  assert.equal(validateState(state), true);
+});
+
+test('a staged habit remains eligible through its end date, including late check-ins', () => {
+  const values = { name: 'Weight', color: 'sage', endDate: '2026-11-05', stageGoal: '  55 kg → 53 kg  ' };
+  let state = addHabit(createInitialState(), values, 'weight');
+  const habit = state.habits.at(-1);
+  assert.equal(habit.stageGoal, '55 kg → 53 kg');
+  assert.equal(isHabitActive(habit, '2026-11-05'), true);
+  assert.equal(isHabitActive(habit, '2026-11-06'), false);
+  state = toggleCompletion(state, 'weight', '2026-11-05', '2026-11-09');
+  assert.equal(isLateCompletion(state, 'weight', '2026-11-05'), true);
+  assert.throws(() => toggleCompletion(state, 'weight', '2026-11-06', '2026-11-09'), /habit has ended/);
+  state = updateHabit(state, 'weight', { ...values, endDate: '' });
+  assert.equal(state.habits.at(-1).stageGoal, '');
+  assert.equal(isHabitActive(state.habits.at(-1), '2026-11-06'), true);
 });

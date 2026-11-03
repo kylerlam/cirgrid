@@ -1,4 +1,5 @@
-import { HABIT_COLORS, addHabit, updateHabit, deleteHabit } from './model.js';
+import { HABIT_COLORS, addHabit, updateHabit, deleteHabit, habitColor, localDateKey, weeklyGoal } from './model.js';
+import { t } from './preferences.js';
 
 export function createHabitEditor({ getState, onChange }) {
   const dialog = document.createElement('dialog');
@@ -12,21 +13,38 @@ export function createHabitEditor({ getState, onChange }) {
       </button>
     </div>
     <form class="habit-form">
-      <label class="field-label" for="habit-name">Habit name</label>
-      <input class="habit-input" id="habit-name" name="name" type="text" required maxlength="60" placeholder="e.g. Morning walk" autocomplete="off" autofocus>
+      <label class="field-label" for="habit-name" data-label="Habit name"></label>
+      <input class="habit-input" id="habit-name" name="name" type="text" required maxlength="60" autocomplete="off" autofocus>
+      <div class="habit-schedule">
+        <div class="habit-field">
+          <label class="field-label" for="habit-weekly-goal" data-label="Days per week"></label>
+          <select class="habit-input" id="habit-weekly-goal" name="weeklyGoal" required></select>
+        </div>
+        <div class="habit-field">
+          <label class="field-label" for="habit-end-date" data-label="End date (optional)"></label>
+          <input class="habit-input" id="habit-end-date" name="endDate" type="date" max="9999-12-31">
+        </div>
+      </div>
+      <div class="habit-field" id="habit-stage" hidden>
+        <label class="field-label" for="habit-stage-goal" data-label="Stage goal (optional)"></label>
+        <input class="habit-input" id="habit-stage-goal" name="stageGoal" type="text" maxlength="120">
+      </div>
       <fieldset>
-        <legend class="field-label">Color</legend>
+        <legend class="field-label" data-label="Color"></legend>
         <div class="color-options"></div>
       </fieldset>
       <p class="dialog-error" role="alert" hidden></p>
       <div class="dialog-actions">
-        <button class="button button-danger" type="button" data-action="delete" hidden>Delete habit</button>
-        <button class="button button-secondary" type="button" data-action="cancel">Cancel</button>
+        <button class="button button-danger" type="button" data-action="delete" data-label="Delete habit" hidden></button>
+        <button class="button button-secondary" type="button" data-action="cancel" data-label="Cancel"></button>
         <button class="button button-primary" type="submit">Add habit</button>
       </div>
     </form>`;
   const heading = dialog.querySelector('h2');
   const input = dialog.querySelector('input[name="name"]');
+  const goal = dialog.querySelector('select[name="weeklyGoal"]');
+  const endDate = dialog.querySelector('input[name="endDate"]');
+  const stageGoal = dialog.querySelector('input[name="stageGoal"]');
   const colors = dialog.querySelector('.color-options');
   const error = dialog.querySelector('.dialog-error');
   const submit = dialog.querySelector('button[type="submit"]');
@@ -36,6 +54,8 @@ export function createHabitEditor({ getState, onChange }) {
   let editingId = null;
   let opener = null;
   let saving = false;
+
+  for (let days = 1; days <= 7; days++) goal.add(new Option(days, days));
 
   for (const color of HABIT_COLORS) {
     const label = document.createElement('label');
@@ -49,9 +69,31 @@ export function createHabitEditor({ getState, onChange }) {
     dot.className = 'color-dot';
     dot.setAttribute('aria-hidden', 'true');
     const name = document.createElement('span');
-    name.textContent = color.label;
+    name.dataset.label = color.label;
     label.append(radio, dot, name);
     colors.append(label);
+  }
+  const customOption = document.createElement('label');
+  customOption.className = 'color-option custom-color-option';
+  customOption.innerHTML = '<input type="color" name="customColor"><span data-label="Custom color"></span>';
+  colors.append(customOption);
+  const customColor = customOption.querySelector('input');
+  const presetColors = [...colors.querySelectorAll('input[name="color"]')];
+
+  function updateStageField() {
+    stageGoal.parentElement.hidden = !endDate.value;
+  }
+
+  endDate.addEventListener('input', updateStageField);
+  customColor.addEventListener('input', () => {
+    for (const radio of presetColors) radio.checked = false;
+    customOption.classList.add('is-selected');
+  });
+  for (const radio of presetColors) {
+    radio.addEventListener('change', () => {
+      customColor.value = habitColor({ color: radio.value }).value;
+      customOption.classList.remove('is-selected');
+    });
   }
 
   function showError(message) {
@@ -66,7 +108,7 @@ export function createHabitEditor({ getState, onChange }) {
   function setSaving(value) {
     saving = value;
     dialog.setAttribute('aria-busy', String(value));
-    for (const control of dialog.querySelectorAll('button, input')) control.disabled = value;
+    for (const control of dialog.querySelectorAll('button, input, select')) control.disabled = value;
   }
 
   async function applyChange(transform, successMessage) {
@@ -80,9 +122,9 @@ export function createHabitEditor({ getState, onChange }) {
         try { return transform(current); }
         catch (failure) { validationError = failure.message; throw failure; }
       }, successMessage);
-      if (!saved) showError(validationError || 'Your changes could not be saved. Please try again.');
+      if (!saved) showError(validationError ? t(validationError) : t('Your changes could not be saved. Please try again.'));
     } catch (failure) {
-      showError(failure.message || 'Your changes could not be saved. Please try again.');
+      showError(t(failure.message || 'Your changes could not be saved. Please try again.'));
     } finally {
       setSaving(false);
     }
@@ -95,10 +137,16 @@ export function createHabitEditor({ getState, onChange }) {
     if (saving) return;
     error.hidden = true;
     const habitId = editingId;
-    const values = { name: input.value, color: dialog.querySelector('input[name="color"]:checked').value };
+    const values = {
+      name: input.value,
+      color: presetColors.find(radio => radio.checked)?.value ?? customColor.value,
+      weeklyGoal: Number(goal.value),
+      endDate: endDate.value,
+      stageGoal: endDate.value ? stageGoal.value : '',
+    };
     await applyChange(current => habitId === null
       ? addHabit(current, values)
-      : updateHabit(current, habitId, values), habitId === null ? 'Habit added.' : 'Habit updated.');
+      : updateHabit(current, habitId, values), t(habitId === null ? 'Habit added.' : 'Habit updated.'));
   });
 
   remove.addEventListener('click', async () => {
@@ -108,10 +156,10 @@ export function createHabitEditor({ getState, onChange }) {
     try {
       const habit = getState().habits.find(item => item.id === habitId);
       if (!habit) throw new Error('This habit no longer exists.');
-      if (!window.confirm(`Delete "${habit.name}" and all of its check-ins? This cannot be undone.`)) return;
-      await applyChange(current => deleteHabit(current, habitId), 'Habit deleted.');
+      if (!window.confirm(t('Delete "{0}" and all of its check-ins? This cannot be undone.', habit.name))) return;
+      await applyChange(current => deleteHabit(current, habitId), t('Habit deleted.'));
     } catch (failure) {
-      showError(failure.message || 'Your changes could not be saved. Please try again.');
+      showError(t(failure.message || 'Your changes could not be saved. Please try again.'));
     }
   });
 
@@ -134,13 +182,23 @@ export function createHabitEditor({ getState, onChange }) {
       if (habitId !== undefined && !habit) throw new Error('This habit no longer exists.');
       editingId = habit?.id ?? null;
       opener = document.activeElement;
-      heading.textContent = habit ? 'Edit habit' : 'New habit';
-      submit.textContent = habit ? 'Save changes' : 'Add habit';
+      for (const label of dialog.querySelectorAll('[data-label]')) label.textContent = t(label.dataset.label);
+      heading.textContent = t(habit ? 'Edit habit' : 'New habit');
+      submit.textContent = t(habit ? 'Save changes' : 'Add habit');
+      dismiss.setAttribute('aria-label', t('Close dialog'));
       remove.hidden = habit === null;
       input.value = habit?.name ?? '';
+      input.placeholder = t('e.g. Morning walk');
+      goal.value = habit ? weeklyGoal(habit, localDateKey()) : 5;
+      endDate.value = habit?.endDate ?? '';
+      stageGoal.value = habit?.stageGoal ?? '';
+      updateStageField();
       error.textContent = '';
       error.hidden = true;
-      for (const radio of colors.querySelectorAll('input')) radio.checked = radio.value === (habit?.color ?? 'blue');
+      const color = habit?.color ?? 'blue';
+      for (const radio of presetColors) radio.checked = radio.value === color;
+      customOption.classList.toggle('is-selected', color.startsWith('#'));
+      customColor.value = habitColor({ color }).value;
       if (!dialog.open) dialog.showModal();
       input.focus();
       input.select();

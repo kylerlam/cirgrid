@@ -1,0 +1,25 @@
+name: cirgrid
+services:
+  app:
+    build: .
+    environment:
+      CIRGRID_SETUP_TOKEN: "${CIRGRID_SETUP_TOKEN:-}"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+    ports:
+      - "${CIRGRID_BIND_ADDRESS:-127.0.0.1}:${CIRGRID_PORT:-4173}:8080"
+    volumes:
+      - cirgrid-data:/app/data
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=3).close()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  cirgrid-data:

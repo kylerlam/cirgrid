@@ -1,0 +1,10 @@
+*
+!Dockerfile
+!server.py
+!cirgrid_data.py
+!index.html
+!login.html
+!src/
+!src/**
+!assets/
+!assets/**

@@ -1,0 +1,62 @@
+.login-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-inline-end: 22px;
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--border);
+}
+.login-main {
+  display: grid;
+  min-height: 72dvh;
+  place-items: center;
+  padding: 20px;
+}
+.login-panel { width: min(100%, 420px); padding: 28px; }
+.login-subtitle { color: var(--muted); margin: 8px 0 20px; }
+.account-form { display: grid; gap: 12px; }
+.account-form label { display: grid; gap: 4px; min-width: 0; }
+.account-form :is(input:not([type="file"]), select) {
+  width: 100%;
+  min-height: 42px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  color: var(--text);
+  background: var(--input-bg);
+}
+.account-form input[type="file"] { width: 100%; min-width: 0; }
+.password-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+.password-entry .button { font-size: 14px; padding-inline: 9px; }
+.account-form small { color: var(--muted); }
+.account-form .button { justify-self: start; }
+.login-panel .account-form .button { justify-self: stretch; }
+.account-message { margin-top: 10px; overflow-wrap: anywhere; }
+.account-message.is-error, #login-error { color: var(--danger-text); }
+.settings-dialog {
+  width: min(480px, calc(100% - 24px));
+  max-height: calc(100dvh - 24px);
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-dialog::backdrop { background: var(--overlay); }
+.settings-dialog section { margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); }
+.settings-dialog h3 { margin: 0 0 10px; font-size: 18px; }
+.settings-actions, .migration-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-actions a { text-decoration: none; }
+.sidebar-footer .settings-button { align-self: start; }
+.migration-notice {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--accent-soft);
+  border-radius: 8px;
+}
+.migration-actions { margin-top: 8px; }
+@media (max-width: 380px) {
+  .login-panel, .settings-dialog { padding: 16px; }
+  .sidebar-footer { flex-wrap: wrap; }
+}

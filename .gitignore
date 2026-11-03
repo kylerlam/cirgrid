@@ -7,3 +7,6 @@ test-results/
 .env
 .env.*
 *.log
+
+__pycache__/
+/data/
