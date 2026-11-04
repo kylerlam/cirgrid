@@ -16,6 +16,18 @@ function frozen(value) {
   return value;
 }
 
+function sampleState() {
+  let state = createInitialState();
+  for (const [id, name, color] of [
+    ['sunscreen', 'Sunscreen', 'blue'],
+    ['exercise', 'Exercise', 'yellow'],
+    ['reading', 'Reading', 'pink'],
+  ]) {
+    state = addHabit(state, { name, color }, id);
+  }
+  return state;
+}
+
 test('calendar helpers keep local dates and Monday-to-Sunday weeks across a year boundary', () => {
   const date = parseDateKey('2026-11-03');
   assert.equal(date.getHours(), 12);
@@ -66,20 +78,18 @@ test('local dates survive Hong Kong UTC boundaries and daylight saving changes',
   }
 });
 
-test('initial data has three named habits and no fabricated completions', () => {
+test('a fresh tracker has no habits or check-ins and owns independent empty collections', () => {
   const state = createInitialState();
   assert.equal(validateState(state), true);
-  assert.deepEqual(state.habits.map(habit => [habit.id, habit.color]), [
-    ['sunscreen', 'blue'], ['exercise', 'yellow'], ['reading', 'pink'],
-  ]);
-  assert.deepEqual(state.completions, {});
+  assert.deepEqual(state, { version: 2, habits: [], completions: {} });
   assert.equal(HABIT_COLORS.find(color => color.id === 'blue').value, '#2d68c4');
-  state.habits[0].name = 'Changed';
-  assert.equal(createInitialState().habits[0].name, 'Sunscreen');
+  state.habits.push({ id: 'local-only' });
+  state.completions['2026-11-03'] = { 'local-only': true };
+  assert.deepEqual(createInitialState(), { version: 2, habits: [], completions: {} });
 });
 
 test('completion toggles are immutable and remove an empty day without disturbing another habit', () => {
-  const before = frozen(createInitialState());
+  const before = frozen(sampleState());
   const completed = toggleCompletion(before, 'reading', '2026-11-03', '2026-11-04');
   assert.equal(isCompleted(before, 'reading', '2026-11-03'), false);
   assert.equal(isCompleted(completed, 'reading', '2026-11-03'), true);
@@ -93,7 +103,7 @@ test('completion toggles are immutable and remove an empty day without disturbin
 });
 
 test('adding and editing habits trims names, preserves records, and rejects invalid or duplicate values', () => {
-  const initial = frozen(createInitialState());
+  const initial = frozen(sampleState());
   const added = addHabit(initial, { name: '  Drink water  ', color: 'teal' }, 'water');
   assert.equal(added.habits.at(-1).name, 'Drink water');
   assert.equal(initial.habits.length, 3);
@@ -124,7 +134,7 @@ test('new habit identifiers contain sixteen random bytes and are unique', () => 
 });
 
 test('deleting a habit removes all its history and preserves unrelated records', () => {
-  let state = toggleCompletion(createInitialState(), 'reading', '2026-10-20');
+  let state = toggleCompletion(sampleState(), 'reading', '2026-10-20');
   state = toggleCompletion(state, 'reading', '2026-11-03');
   state = frozen(toggleCompletion(state, 'exercise', '2026-11-03', '2026-11-03'));
   const result = deleteHabit(state, 'reading');
@@ -138,7 +148,7 @@ test('deleting a habit removes all its history and preserves unrelated records',
 
 test('schema validation rejects unsupported versions, duplicate identities, malformed dates, and orphan records', () => {
   const invalid = [];
-  const changed = mutate => { const state = createInitialState(); mutate(state); invalid.push(state); };
+  const changed = mutate => { const state = sampleState(); mutate(state); invalid.push(state); };
   changed(state => { state.version = 3; });
   changed(state => { state.extra = true; });
   changed(state => { state.habits[1].id = 'sunscreen'; });
@@ -175,8 +185,16 @@ test('legacy browser records migrate without changing the source or guessing lat
   assert.equal(JSON.stringify(legacy), raw);
 });
 
+test('nonempty current records are retained while new trackers start empty', () => {
+  const saved = frozen(toggleCompletion(sampleState(), 'reading', '2026-11-03', '2026-11-09'));
+  assert.strictEqual(migrateState(saved), saved);
+  assert.equal(isLateCompletion(saved, 'reading', '2026-11-03'), true);
+  assert.equal(saved.habits.length, 3);
+  assert.deepEqual(createInitialState(), { version: 2, habits: [], completions: {} });
+});
+
 test('weekly targets change during the current week without altering earlier weeks', () => {
-  const initial = createInitialState();
+  const initial = sampleState();
   const values = { name: 'Reading', color: '#E85761', weeklyGoal: 3 };
   const changed = updateHabit(initial, 'reading', values, '2026-11-05');
   const habit = changed.habits.at(-1);

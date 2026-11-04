@@ -159,8 +159,12 @@ class ServerTest(unittest.TestCase):
         cookie = self.login()
         status, _, backup = self.request("GET", "/api/export?format=json", cookie=cookie)
         self.assertEqual(status, 200)
-        self.assertEqual([habit["id"] for habit in backup["state"]["habits"]], ["sunscreen", "exercise", "reading"])
-        self.assertEqual(backup["state"]["completions"], {})
+        empty_state = {"version": 2, "habits": [], "completions": {}}
+        self.assertEqual(backup["state"], empty_state)
+        status, _, empty_yaml = self.request("GET", "/api/export", cookie=cookie)
+        self.assertEqual(status, 200)
+        self.assertEqual(self.request("POST", "/api/import", {"format": "yaml", "text": empty_yaml.decode()},
+                                      cookie=cookie)[2], {"state": empty_state})
         self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2], {"state": None, "revision": 0})
         self.assertEqual(self.request("GET", "/api/export", cookie=cookie,
                                       headers={"Sec-Fetch-Site": "same-site"})[0], 403)

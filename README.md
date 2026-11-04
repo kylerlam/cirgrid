@@ -20,6 +20,8 @@ python3 server.py
 
 Open **http://127.0.0.1:4173** and sign in with the initial account, **admin / admin123**, shown below the sign-in form. Change the password in **Settings → Account** after signing in. New passwords must contain at least 12 characters. The initial-credentials panel disappears after a successful change to a different password. Username-only changes keep the panel visible with the current username.
 
+A fresh installation starts with no habits or check-ins. Existing saved data and imported browser records are retained. Personal databases, exports, and local documents are excluded from Git and Docker build inputs.
+
 The default server binds to the loopback interface. Set `HOST`, `PORT`, or `DATA_DIR` to change the listener or database directory. The initial account is created automatically when the database has no account.
 
 ## Run with Docker Compose

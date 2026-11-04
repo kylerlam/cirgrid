@@ -203,14 +203,7 @@ class Store:
         with self.export_lock:
             state = self.read_state()["state"]
             if state is None:
-                state = {"version": 2, "habits": [
-                    {"id": identifier, "name": name, "color": color, "weeklyGoals": {"0001-01-01": 5},
-                     "endDate": "", "stageGoal": ""}
-                    for identifier, name, color in (
-                        ("sunscreen", "Sunscreen", "blue"), ("exercise", "Exercise", "yellow"),
-                        ("reading", "Reading", "pink"),
-                    )
-                ], "completions": {}}
+                state = {"version": 2, "habits": [], "completions": {}}
             payload = {"format": "cirgrid-export", "state": state}
             yaml = dump_yaml(payload).encode()
             # A completed download and the server snapshot describe the same revision.

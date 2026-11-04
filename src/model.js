@@ -91,11 +91,7 @@ export function formatWeekRange(dateKey, locale = 'en-US') {
 export function createInitialState() {
   return {
     version: 2,
-    habits: [
-      { id: 'sunscreen', name: 'Sunscreen', color: 'blue' },
-      { id: 'exercise', name: 'Exercise', color: 'yellow' },
-      { id: 'reading', name: 'Reading', color: 'pink' },
-    ].map(habit => ({ ...habit, weeklyGoals: { [firstWeek]: defaultGoal }, endDate: '', stageGoal: '' })),
+    habits: [],
     completions: {},
   };
 }
