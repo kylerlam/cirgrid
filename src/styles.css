@@ -43,7 +43,8 @@ h1, h2, p { margin: 0; }
 .habit-dot { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%; }
 .habit-name { overflow-wrap: anywhere; }
 .sidebar-empty { color: var(--muted-text); padding-inline: 8px; }
-.sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 14px; padding: 28px 22px; font-size: 14px; color: var(--muted-text); }
+.sidebar-footer { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 28px 12px; font-size: 14px; color: var(--muted-text); }
+.app-version { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .source-link { display: flex; align-items: center; gap: 9px; }
 .source-link { width: fit-content; text-decoration: none; }
 .source-link:hover { color: var(--text); text-decoration: underline; }
@@ -220,7 +221,7 @@ h1, h2, p { margin: 0; }
   .habit-list { flex-direction: row; flex-wrap: wrap; gap: 4px 8px; }
   .habit-item { width: auto; max-width: 100%; min-height: 40px; gap: 7px; padding: 6px; font-size: 14px; }
   .habit-item .habit-name { max-width: 130px; }
-  .sidebar-footer { flex-direction: row; justify-content: space-between; gap: 8px; padding: 8px 18px 14px; font-size: 13px; }
+  .sidebar-footer { padding: 8px 18px 14px; font-size: 13px; }
   .topbar { height: 78px; padding: 0 16px; }
   .topbar h1 { font-size: 25px; }
   .topbar .button { font-size: 15px; padding-inline: 11px; }
