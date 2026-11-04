@@ -43,8 +43,8 @@ h1, h2, p { margin: 0; }
 .habit-dot { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%; }
 .habit-name { overflow-wrap: anywhere; }
 .sidebar-empty { color: var(--muted-text); padding-inline: 8px; }
-.sidebar-footer { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 28px 12px; font-size: 14px; color: var(--muted-text); }
-.app-version { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sidebar-footer { margin-top: auto; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 28px 12px; font-size: 14px; color: var(--muted-text); }
+.app-version { font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .source-link { display: flex; align-items: center; gap: 9px; }
 .source-link { width: fit-content; text-decoration: none; }
 .source-link:hover { color: var(--text); text-decoration: underline; }
