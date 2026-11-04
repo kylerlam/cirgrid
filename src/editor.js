@@ -1,7 +1,7 @@
 import { HABIT_COLORS, addHabit, updateHabit, deleteHabit, habitColor, localDateKey, weeklyGoal } from './model.js';
 import { t } from './preferences.js';
 
-export function createHabitEditor({ getState, onChange }) {
+export function createHabitEditor({ getState, onChange, getToday = localDateKey }) {
   const dialog = document.createElement('dialog');
   dialog.className = 'habit-dialog';
   dialog.setAttribute('aria-labelledby', 'habit-dialog-title');
@@ -198,7 +198,7 @@ export function createHabitEditor({ getState, onChange }) {
     };
     await applyChange(current => habitId === null
       ? addHabit(current, values)
-      : updateHabit(current, habitId, values), t(habitId === null ? 'Habit added.' : 'Habit updated.'));
+      : updateHabit(current, habitId, values, getToday()), t(habitId === null ? 'Habit added.' : 'Habit updated.'));
   });
 
   remove.addEventListener('click', async () => {
@@ -248,7 +248,7 @@ export function createHabitEditor({ getState, onChange }) {
       remove.hidden = habit === null;
       input.value = habit?.name ?? '';
       input.placeholder = t('e.g. Morning walk');
-      goal.value = habit ? weeklyGoal(habit, localDateKey()) : 5;
+      goal.value = habit ? weeklyGoal(habit, getToday()) : 5;
       endDate.value = habit?.endDate ?? '';
       stageGoal.value = habit?.stageGoal ?? '';
       updateStageField();

@@ -3,9 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="theme-color" content="#5c7664">
-  <meta name="description" content="Build daily habits with synchronized circular and grid trackers. A private, open-source habit tracker.">
-  <title data-i18n="Habit tracker">CirGrid — Habit tracker</title>
+  <meta name="description" content="Try CirGrid with fictional habit records. This browser-only demo resets daily at midnight in Hong Kong.">
+  <title data-i18n="Demo">CirGrid — Demo</title>
   <link rel="icon" href="/assets/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/src/themes.css">
   <link rel="stylesheet" href="/src/styles.css">
@@ -37,12 +38,12 @@
       <header class="topbar"><h1 id="page-title" tabindex="-1" data-i18n="Weekly tracker">Weekly tracker</h1><button id="new-habit" class="button button-primary" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg><span data-i18n="New habit">New habit</span></button></header>
       <main id="main-content" class="main-content" tabindex="-1">
         <div id="storage-error" class="error-banner" role="alert" hidden></div>
-        <section id="migration-notice" class="migration-notice" aria-label="Import browser records" data-i18n-label="Import browser records" hidden>
-          <p data-i18n="CirGrid found check-ins and habits saved by the previous version in this browser.">CirGrid found check-ins and habits saved by the previous version in this browser.</p>
-          <div class="migration-actions">
-            <button id="migrate-browser" class="button button-secondary" type="button" data-i18n="Import browser records">Import browser records</button>
-            <button id="download-browser" class="button button-secondary" type="button" data-i18n="Download browser backup">Download browser backup</button>
+        <section class="demo-banner" aria-label="Demo" data-i18n-label="Demo">
+          <div class="demo-description">
+            <strong><span data-i18n="Demo">Demo</span> · v1.0.0</strong>
+            <p data-i18n="Fictional sample data, saved only in this browser. Resets daily at midnight in Hong Kong.">Fictional sample data, saved only in this browser. Resets daily at midnight in Hong Kong.</p>
           </div>
+          <button id="reset-demo" class="button button-secondary" type="button" data-i18n="Reset sample data">Reset sample data</button>
         </section>
         <section id="tracker" aria-labelledby="week-range">
         <div class="week-toolbar">

@@ -1,5 +1,16 @@
 // Translation order: Spanish, Simplified Chinese, Traditional Chinese.
 export const translations = {
+  "Saved demo data is invalid. Reset sample data to restore the demo.": ["Los datos de demostración guardados no son válidos. Restablece los datos de ejemplo para recuperar la demostración.", "保存的演示数据无效，请重置示例数据以恢复演示。", "儲存的示範資料無效，請重設範例資料以恢復示範。"],
+  "Demo browser storage is unavailable. Allow storage to keep your changes.": ["El almacenamiento del navegador no está disponible. Permite el almacenamiento para guardar tus cambios.", "浏览器存储不可用，请允许存储以保存更改。", "瀏覽器儲存空間無法使用，請允許儲存以保留變更。"],
+  "Your demo changes could not be saved. Browser storage may be full or unavailable.": ["No se pudieron guardar tus cambios. El almacenamiento del navegador puede estar lleno o no estar disponible.", "无法保存演示更改，浏览器存储可能已满或不可用。", "無法儲存示範變更，瀏覽器儲存空間可能已滿或無法使用。"],
+  "Invalid demo habit data cannot be saved.": ["No se pueden guardar datos de hábitos de demostración no válidos.", "无法保存无效的演示习惯数据。", "無法儲存無效的示範習慣資料。"],
+  "Demo data changed in another tab. Try again.": ["Los datos de demostración cambiaron en otra pestaña. Inténtalo de nuevo.", "其他标签页已更新演示数据，请重试。", "其他分頁已更新示範資料，請再試一次。"],
+  "The demo revision cannot be advanced.": ["No se puede actualizar la revisión de la demostración.", "无法更新演示数据版本。", "無法更新示範資料版本。"],
+  "Demo": ["Demostración", "演示版", "示範版"],
+  "Reset sample data": ["Restablecer datos de ejemplo", "重置示例数据", "重設範例資料"],
+  "Sample data reset.": ["Datos de ejemplo restablecidos.", "示例数据已重置。", "範例資料已重設。"],
+  "Fictional sample data, saved only in this browser. Resets daily at midnight in Hong Kong.": ["Datos de ejemplo ficticios, guardados solo en este navegador. Se restablecen cada día a medianoche en Hong Kong.", "虚构的示例数据，仅保存在此浏览器中。每天香港时间午夜重置。", "虛構的範例資料，僅儲存在此瀏覽器中。每天香港時間午夜重設。"],
+  "Demo data could not be loaded. Check browser storage and reload.": ["No se pudieron cargar los datos de demostración. Revisa el almacenamiento del navegador y recarga la página.", "无法加载演示数据，请检查浏览器存储后重新加载。", "無法載入示範資料，請檢查瀏覽器儲存空間後重新載入。"],
   "Habit history": ["Historial de hábitos", "习惯历史", "習慣歷史"],
   "Select a date to see its details here.": ["Selecciona una fecha para ver sus detalles aquí.", "点击日期，在当前页查看当天详情。", "點選日期，在此查看當天詳情。"],
   "View by": ["Ver por", "查看单位", "查看單位"],

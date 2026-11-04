@@ -2,15 +2,16 @@
   "name": "cirgrid",
   "version": "1.0.0",
   "private": true,
-  "description": "An open-source habit tracker with synchronized circular and grid views.",
+  "description": "A static, browser-local CirGrid demo with fictional sample habits.",
   "type": "module",
   "license": "MIT",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
-    "start": "python3 server.py",
-    "dev": "python3 server.py",
+    "start": "python3 -m http.server 4174 --bind 127.0.0.1 --directory dist",
+    "dev": "python3 -m http.server 4174 --bind 127.0.0.1 --directory dist",
+    "build": "node scripts/build-demo.js",
     "test": "node --test",
     "check": "node scripts/check.js"
   }

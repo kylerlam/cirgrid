@@ -1,58 +1,49 @@
-# CirGrid
+# CirGrid — Browser Demo
 
-CirGrid is a private, open-source habit tracker with synchronized circular and grid views. It is a sister app to [Daily Todo](https://github.com/kylerlam/daily-todo), with its own account and database.
+This `codex/demo` branch demonstrates CirGrid 1.0.0 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
 
-- Check in through either tracker and browse Monday-to-Sunday weeks.
-- Set a weekly target of 1–7 days for each habit. The default is 5. Changes apply to the current week and later weeks.
-- See each week's score and outcome. Make up missed check-ins in past weeks. The gold outline identifies a check-in added after its week ended.
-- Open the separate Habit history page to browse a habit by month or year. Calendar months show every real date, including leap days. Select dates to read their details on the same page. Use **Open weekly tracker** when you want to review or make up check-ins in that week.
-- Leave the end date blank for an ongoing habit. Set an end date to make it a stage, with optional goal text such as “55 kg → 53 kg”. The end date is the last eligible day. The stage disappears from the current tracker the following day, and its past weeks remain available for review and makeup check-ins.
-- Pick a preset or custom habit color. Choose from ten Daily Todo themes and switch among English, Spanish, Simplified Chinese, and Traditional Chinese. Theme and language are saved per browser.
-- Sign in on desktop or mobile to use the same saved habits and check-ins.
+The production `main` branch starts empty and keeps its account and SQLite storage separate.
 
-## Run locally
+## Try locally
 
-Use Python 3.13. No package installation or frontend build is required.
+No application dependencies or package installation are required.
 
 ```sh
-python3 server.py
+npm run build
+npm start
 ```
 
-Open **http://127.0.0.1:4173** and sign in with the initial account, **admin / admin123**, shown below the sign-in form. Change the password in **Settings → Account** after signing in. New passwords must contain at least 12 characters. The initial-credentials panel disappears after a successful change to a different password. Username-only changes keep the panel visible with the current username.
+Open **http://127.0.0.1:4174**. Python only serves the static `dist/` directory; the demo does not run the production Python server. Use HTTP rather than opening the HTML as a file.
 
-A fresh installation starts with no habits or check-ins. Existing saved data and imported browser records are retained. Personal databases, exports, and local documents are excluded from Git and Docker build inputs.
+## Features to explore
 
-The default server binds to the loopback interface. Set `HOST`, `PORT`, or `DATA_DIR` to change the listener or database directory. The initial account is created automatically when the database has no account.
+- Check in through synchronized circular and grid views.
+- Compare different weekly targets and past weekly outcomes.
+- Make up a missed day in a past week and see its gold outline.
+- Review active and expired staged habits with end dates and optional goals.
+- Browse month and year history and read selected dates without leaving the calendar.
+- Edit habits, choose hexadecimal colors, switch themes, and try four interface languages.
 
-## Run with Docker Compose
+## Isolation and reset
 
-```sh
-docker compose up --build -d
-```
+Only the `cirgrid.demo.state.v1` localStorage key contains demo records. The demo does not read production tracker data, cookies, credentials, or backups. Browser profiles and site origins are independent; two tabs on the same origin share demo changes.
 
-Open **http://127.0.0.1:4173** and sign in using the initial account shown below the form. Compose stores SQLite and the export snapshot in the `cirgrid-data` volume. Set `CIRGRID_PORT` to change the host port. For an HTTPS reverse proxy, preserve the public Host header and set `SESSION_COOKIE_SECURE=true`. The default published address is loopback and can be changed with `CIRGRID_BIND_ADDRESS`.
+Changes persist during the same Hong Kong calendar day. The app checks for a new day on focus, visibility return, and every 60 seconds. A new day restores fictional samples. Browser storage can be cleared or unavailable and is not a private account or a backup.
 
-## Bring over browser records
+## Publication
 
-Open the new CirGrid at the same hostname, port, and protocol as the previous version, using the same browser profile. After signing in, select **Import browser records** when the tracker detects the old data. The original browser copy is retained. For a different destination URL, use **Download browser backup** at the old origin and import that JSON file at the new destination.
+Deploy **only `dist/`** to the independent Cloudflare Pages project `cirgrid-demo`, using the `codex/demo` production branch label. A Git push does not publish a Direct Upload project. The build copies an explicit public-file allowlist and rejects JavaScript API clients. CSP blocks network connections.
 
-## Data and backups
+The retained Python server, Docker configuration, login page, and production tests are reference source only. Never deploy the repository root, run the production server for this demo, or mount production data. Private documents, databases, environment files, build output, and credentials are excluded.
 
-Use **Settings → Data** to download YAML or JSON, or import a CirGrid backup. Exports contain habits, weekly targets, and check-ins. They exclude credentials and sessions. Export also refreshes the server-side `cirgrid.yml` snapshot. The primary database is `data/cirgrid.sqlite3` for a local run, or `/app/data/cirgrid.sqlite3` in Docker.
-
-Import adds missing records and rejects conflicting backups as a batch. Importing legacy browser data preserves the current settings and existing check-ins for habits with matching IDs. Make a fresh export before moving or restoring data.
-
-## Development
+## Checks
 
 ```sh
 npm test
 npm run check
-python3 -B -m unittest discover -s test -p 'test_*.py' -v
-docker compose config --quiet
+npm run build
 ```
 
-Use Node.js 22 or later for JavaScript checks. See [CONTRIBUTING.md](CONTRIBUTING.md) for browser verification and commit conventions.
+The demo store tests cover samples, validation, persistence, conflicts, manual reset, Hong Kong midnight, clock rollback, and storage failures.
 
-## License
-
-MIT. See [LICENSE](LICENSE).
+Released under the MIT License. See [LICENSE](LICENSE).

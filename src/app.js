@@ -1,46 +1,42 @@
 import {
-  STORAGE_KEY, createInitialState, habitColor, isCompleted, migrateState,
-  localDateKey, weekDates, shiftDate, formatWeekRange, toggleCompletion,
+  createInitialState, habitColor, isCompleted,
+  weekDates, shiftDate, formatWeekRange, toggleCompletion,
 } from './model.js';
 import { renderCircle, renderGrid } from './views.js';
 import { renderHistory } from './history.js';
 import { historyPeriod, shiftHistoryPeriod } from './history-period.js';
 import { createHabitEditor } from './editor.js';
-import { request } from './api.js';
+import { createDemoStore, demoToday, DEMO_STORAGE_KEY } from './demo-store.js';
 import { applyPreferences, getLanguage, t } from './preferences.js';
 import { createSettings } from './settings.js';
 
 const elements = Object.fromEntries(['habit-list', 'new-habit', 'week-range', 'previous-week', 'next-week',
-  'selected-date', 'today', 'circle-tracker', 'grid-tracker', 'storage-error', 'status', 'migration-notice',
-  'migrate-browser', 'download-browser', 'tracker', 'habit-history', 'history-habit', 'history-unit',
+  'selected-date', 'today', 'circle-tracker', 'grid-tracker', 'storage-error', 'status', 'reset-demo',
+  'tracker', 'habit-history', 'history-habit', 'history-unit',
   'history-date', 'history-previous', 'history-next', 'history-current'].map(id => [id, document.getElementById(id)]));
+const store = createDemoStore();
 let state = createInitialState();
 let revision = 0;
-let selectedDate = localDateKey();
+let selectedDate = demoToday();
 let historyUnit = 'month';
-let historyAnchor = localDateKey();
+let historyAnchor = demoToday();
 let pending = Promise.resolve();
-const changes = typeof BroadcastChannel === 'function' ? new BroadcastChannel('cirgrid-server-state') : null;
+const changes = typeof BroadcastChannel === 'function' ? new BroadcastChannel('cirgrid-demo-state') : null;
 
 function showError(message) {
   elements['storage-error'].textContent = t(message);
   elements['storage-error'].hidden = false;
 }
 
-function showSignIn() {
-  location.replace(location.hash === '#habit-history' ? '/login#habit-history' : '/login');
-}
-
 function accept(snapshot) {
-  state = snapshot.state === null ? createInitialState() : migrateState(snapshot.state);
+  state = snapshot.state;
   revision = snapshot.revision;
   elements['storage-error'].hidden = true;
   render();
 }
 
 function reportFailure(error) {
-  if (error.status === 401) showSignIn();
-  else if (error instanceof TypeError || error instanceof RangeError) elements.status.textContent = t(error.message);
+  if (error instanceof TypeError || error instanceof RangeError) elements.status.textContent = t(error.message);
   else showError(error.message);
 }
 
@@ -55,13 +51,13 @@ async function write(transform) {
     const next = transform(state, revision);
     if (next === state) return next;
     try {
-      const saved = await request('/api/state', { method: 'PUT', data: { state: next, revision } });
+      const saved = await store.save(next, revision);
       accept(saved);
       changes?.postMessage(saved.revision);
       return state;
     } catch (error) {
       if (error.status !== 409 || attempt === 2) throw error;
-      accept(await request('/api/state'));
+      accept(await store.read());
     }
   }
 }
@@ -77,11 +73,11 @@ async function applyChange(transform, message) {
   }
 }
 
-const editor = createHabitEditor({ getState: () => state, onChange: applyChange });
+const editor = createHabitEditor({ getState: () => state, getToday: demoToday, onChange: applyChange });
 
 function toggle(habitId, dateKey) {
   const completed = !isCompleted(state, habitId, dateKey);
-  const today = localDateKey();
+  const today = demoToday();
   return applyChange(current => isCompleted(current, habitId, dateKey) === completed
     ? current : toggleCompletion(current, habitId, dateKey, today), next => {
     const habit = next.habits.find(item => item.id === habitId);
@@ -132,7 +128,7 @@ function showPage(focus = false) {
   title.dataset.i18n = history ? 'Habit history' : 'Weekly tracker';
   title.textContent = t(title.dataset.i18n);
   const pageTitle = document.querySelector('title');
-  pageTitle.dataset.i18n = history ? 'Habit history' : 'Habit tracker';
+  pageTitle.dataset.i18n = 'Demo';
   pageTitle.textContent = 'CirGrid — ' + t(pageTitle.dataset.i18n);
   for (const link of document.querySelectorAll('.navigation .nav-item')) {
     const active = link.hash === (history ? '#habit-history' : '#tracker');
@@ -150,7 +146,7 @@ function render() {
   const active = document.activeElement;
   const focus = active?.dataset?.view ? { view: active.dataset.view, habitId: active.dataset.habitId, date: active.dataset.date } : null;
   const editHabit = active?.dataset?.editHabit;
-  const today = localDateKey();
+  const today = demoToday();
   elements['selected-date'].value = selectedDate;
   elements['week-range'].textContent = formatWeekRange(selectedDate, getLanguage());
   const options = { state, dates: weekDates(selectedDate), selectedDate, today, onToggle: toggle };
@@ -205,7 +201,7 @@ function jumpToWeek(dateKey) {
 function selectHistoryDate(dateKey) {
   try {
     historyPeriod(dateKey, historyUnit);
-    if (dateKey > localDateKey()) throw new RangeError('Choose a date on or before today.');
+    if (dateKey > demoToday()) throw new RangeError('Choose a date on or before today.');
     historyAnchor = dateKey;
     elements.status.textContent = '';
     render();
@@ -220,133 +216,52 @@ function shiftWeek(offset) {
   catch (error) { elements.status.textContent = t(error.message); }
 }
 
-function mergeBackup(current, incoming, legacy) {
-  const habits = current.habits.slice();
-  let changed = false;
-  const conflict = () => new Error('This backup conflicts with saved habits or check-ins. No records were changed.');
-  for (const habit of incoming.habits) {
-    const existing = habits.find(item => item.id === habit.id);
-    if (!existing) {
-      if (habits.some(item => item.name.toLowerCase() === habit.name.toLowerCase())) throw conflict();
-      habits.push(habit);
-      changed = true;
-    } else if (!legacy && (existing.name !== habit.name || existing.color !== habit.color
-      || existing.endDate !== habit.endDate || existing.stageGoal !== habit.stageGoal
-      || Object.keys(existing.weeklyGoals).length !== Object.keys(habit.weeklyGoals).length
-      || Object.entries(habit.weeklyGoals).some(([date, goal]) => existing.weeklyGoals[date] !== goal))) {
-      throw conflict();
-    }
-  }
-  const completions = { ...current.completions };
-  for (const [date, records] of Object.entries(incoming.completions)) {
-    const day = { ...completions[date] };
-    for (const [id, value] of Object.entries(records)) {
-      if (!legacy && Object.hasOwn(day, id) && day[id] !== value) throw conflict();
-      if (!Object.hasOwn(day, id)) {
-        day[id] = value;
-        changed = true;
-      }
-    }
-    completions[date] = day;
-  }
-  return changed ? { ...current, habits, completions } : current;
-}
-
-function importState(raw) {
-  const incoming = migrateState(raw);
-  return serialize(() => write((current, currentRevision) => currentRevision === 0
-    ? incoming : mergeBackup(current, incoming, raw.version === 1)));
-}
-
-async function importFile(file) {
-  if (file.size > 10 * 1024 * 1024) throw new Error('Choose a file no larger than 10 MiB.');
-  const format = /\.json$/i.test(file.name) ? 'json' : 'yaml';
-  const result = await request('/api/import', { method: 'POST', data: { text: await file.text(), format } });
-  await importState(result.state);
-}
-
-function download(blob, name) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = name;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-async function exportFile(format) {
-  const response = await fetch('/api/export?format=' + format);
-  if (!response.ok) {
-    const body = await response.json();
-    throw Object.assign(new Error(body.message), { status: response.status });
-  }
-  download(await response.blob(), 'cirgrid.' + (format === 'yaml' ? 'yml' : 'json'));
-}
-
-function offerBrowserMigration() {
-  let original;
-  const migrationKey = 'cirgrid.browser-imported';
-  try {
-    original = localStorage.getItem(STORAGE_KEY);
-    if (original === null || localStorage.getItem(migrationKey) === original) return;
-  } catch {
-    return;
-  }
-  elements['migration-notice'].hidden = false;
-  elements['download-browser'].addEventListener('click', () => download(new Blob([original], { type: 'application/json' }), 'cirgrid-browser-backup.json'));
-  elements['migrate-browser'].addEventListener('click', async () => {
-    const button = elements['migrate-browser'];
-    button.disabled = true;
-    try {
-      await importState(JSON.parse(original));
-      try { localStorage.setItem(migrationKey, original); } catch { /* The original remains available. */ }
-      elements['migration-notice'].hidden = true;
-      elements.status.textContent = t('Browser records imported.');
-    } catch (error) {
-      if (error instanceof SyntaxError) showError('The browser backup could not be read.');
-      else reportFailure(error);
-      button.disabled = false;
-    }
-  });
-}
-
 function refresh() {
   void serialize(async () => {
-    const snapshot = await request('/api/state');
-    if (snapshot.revision !== revision) accept(snapshot);
+    const snapshot = await store.read();
+    if (snapshot.revision !== revision) {
+      accept(snapshot);
+      changes?.postMessage(snapshot.revision);
+    }
   }).catch(reportFailure);
 }
 
 function refreshAtMidnight() {
-  const midnight = new Date();
-  midnight.setHours(24, 0, 0, 0);
+  const hongKong = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  const midnight = Date.UTC(hongKong.getUTCFullYear(), hongKong.getUTCMonth(), hongKong.getUTCDate() + 1)
+    - 8 * 60 * 60 * 1000;
   setTimeout(() => {
-    render();
+    refresh();
     refreshAtMidnight();
-  }, midnight.getTime() - Date.now());
+  }, midnight - Date.now());
+}
+
+async function resetDemo() {
+  const button = elements['reset-demo'];
+  button.disabled = true;
+  try {
+    await serialize(async () => {
+      const snapshot = await store.reset();
+      accept(snapshot);
+      changes?.postMessage(snapshot.revision);
+    });
+    elements.status.textContent = t('Sample data reset.');
+  } catch (error) {
+    reportFailure(error);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 async function start() {
   applyPreferences();
-  const session = await request('/api/session');
-  if (!session.authenticated) {
-    showSignIn();
-    return;
-  }
-  const snapshot = await request('/api/state');
-  const settings = createSettings({
-    username: session.username, onImport: importFile, onDownload: exportFile,
-    onSignOut: async () => {
-      await request('/api/logout', { method: 'POST', data: {} });
-      showSignIn();
-      return 'Signed out.';
-    },
-  });
+  const settings = createSettings();
   document.getElementById('open-settings').addEventListener('click', settings.open);
   elements['new-habit'].addEventListener('click', () => editor.open());
+  elements['reset-demo'].addEventListener('click', resetDemo);
   elements['previous-week'].addEventListener('click', () => shiftWeek(-7));
   elements['next-week'].addEventListener('click', () => shiftWeek(7));
-  elements['today'].addEventListener('click', () => selectDate(localDateKey()));
+  elements['today'].addEventListener('click', () => selectDate(demoToday()));
   elements['selected-date'].addEventListener('change', event => selectDate(event.target.value));
   elements['history-habit'].addEventListener('change', render);
   elements['history-unit'].addEventListener('change', event => {
@@ -357,7 +272,7 @@ async function start() {
   for (const [id, offset] of [['history-previous', -1], ['history-next', 1]]) {
     elements[id].addEventListener('click', () => selectHistoryDate(shiftHistoryPeriod(historyAnchor, historyUnit, offset)));
   }
-  elements['history-current'].addEventListener('click', () => selectHistoryDate(localDateKey()));
+  elements['history-current'].addEventListener('click', () => selectHistoryDate(demoToday()));
   document.querySelector('.skip-link').addEventListener('click', event => {
     event.preventDefault();
     document.getElementById('main-content').focus();
@@ -365,18 +280,27 @@ async function start() {
   window.addEventListener('hashchange', () => showPage(true));
   window.addEventListener('languagechange', render);
   window.addEventListener('focus', refresh);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refresh();
+  });
+  window.addEventListener('storage', event => {
+    if (event.key === DEMO_STORAGE_KEY) refresh();
+  });
+  setInterval(() => {
+    if (!document.hidden) refresh();
+  }, 60_000);
   changes?.addEventListener('message', refresh);
   document.getElementById('app-shell').hidden = false;
-  accept(snapshot);
-  offerBrowserMigration();
+  try { accept(await store.read()); }
+  catch (error) {
+    render();
+    reportFailure(error);
+  }
   refreshAtMidnight();
 }
 
-start().catch(error => {
-  if (error.status === 401) showSignIn();
-  else {
-    const startup = document.getElementById('startup-error');
-    startup.textContent = t('CirGrid could not connect. Reload the page to try again.');
-    startup.hidden = false;
-  }
+start().catch(() => {
+  const startup = document.getElementById('startup-error');
+  startup.textContent = t('Demo data could not be loaded. Check browser storage and reload.');
+  startup.hidden = false;
 });
