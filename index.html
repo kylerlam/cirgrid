@@ -60,7 +60,7 @@
           <div class="history-header">
             <div class="panel-heading">
               <h2 id="history-range" tabindex="-1"></h2>
-              <p data-i18n="Select a day to view or make up check-ins in its week.">Select a day to view or make up check-ins in its week.</p>
+              <p data-i18n="Select a date to see its details here.">Select a date to see its details here.</p>
             </div>
             <div class="history-filter">
               <label for="history-habit" class="field-label" data-i18n="Habit">Habit</label>
@@ -73,8 +73,6 @@
               <select id="history-unit" class="habit-input">
                 <option value="year" data-i18n="Year">Year</option>
                 <option value="month" data-i18n="Month" selected>Month</option>
-                <option value="week" data-i18n="Week">Week</option>
-                <option value="day" data-i18n="Day">Day</option>
               </select>
             </div>
             <div class="habit-field history-date-field">
@@ -87,6 +85,7 @@
               <button id="history-next" class="button button-secondary icon-button" type="button" aria-label="Next period" data-i18n-label="Next period"><svg class="icon" aria-hidden="true"><use href="#icon-right"/></svg></button>
             </div>
           </div>
+          <section id="history-detail" class="history-detail" aria-labelledby="history-detail-date" hidden></section>
           <div id="history-heatmap"></div>
           <div id="history-key" class="history-key" aria-label="Completion key" data-i18n-label="Completion key">
             <span><span class="heatmap-mark is-complete" aria-hidden="true"></span><span data-i18n="Completed">Completed</span></span>

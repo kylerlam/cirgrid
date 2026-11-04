@@ -160,13 +160,7 @@ function render() {
   elements['history-unit'].value = historyUnit;
   elements['history-date'].value = historyAnchor;
   elements['history-date'].max = today;
-  const dayView = historyUnit === 'day';
-  elements['history-current'].dataset.i18n = dayView ? 'Today' : 'Current period';
-  elements['history-current'].textContent = t(elements['history-current'].dataset.i18n);
   for (const [id, offset] of [['history-previous', -1], ['history-next', 1]]) {
-    const label = dayView ? (offset < 0 ? 'Previous day' : 'Next day') : (offset < 0 ? 'Previous period' : 'Next period');
-    elements[id].dataset.i18nLabel = label;
-    elements[id].setAttribute('aria-label', t(label));
     try {
       const next = shiftHistoryPeriod(historyAnchor, historyUnit, offset);
       elements[id].disabled = historyPeriod(next, historyUnit).start > today;
@@ -174,7 +168,10 @@ function render() {
       elements[id].disabled = true;
     }
   }
-  renderHistory(elements['habit-history'], { state, selectedDate, today, unit: historyUnit, anchor: historyAnchor, onSelectDate: jumpToWeek });
+  renderHistory(elements['habit-history'], {
+    state, selectedDate: historyAnchor, today, unit: historyUnit, anchor: historyAnchor,
+    onSelectDate: selectHistoryDate, onOpenWeek: jumpToWeek,
+  });
   showPage();
   if (focus) {
     const cell = [...document.querySelectorAll('[data-view]')].find(node => node.dataset.view === focus.view && node.dataset.habitId === focus.habitId && node.dataset.date === focus.date);
@@ -210,6 +207,7 @@ function selectHistoryDate(dateKey) {
     historyPeriod(dateKey, historyUnit);
     if (dateKey > localDateKey()) throw new RangeError('Choose a date on or before today.');
     historyAnchor = dateKey;
+    elements.status.textContent = '';
     render();
   } catch (error) {
     elements['history-date'].value = historyAnchor;
