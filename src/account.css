@@ -27,8 +27,25 @@
   background: var(--input-bg);
 }
 .account-form input[type="file"] { width: 100%; min-width: 0; }
-.password-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
-.password-entry .button { font-size: 14px; padding-inline: 9px; }
+.password-entry { position: relative; }
+.account-form .password-entry input { padding-inline-end: 44px; }
+.password-toggle {
+  position: absolute;
+  inset-inline-end: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted-text);
+}
+.password-toggle:hover { color: var(--text); background: var(--surface-soft); }
+.password-toggle.is-visible .eye-slash { display: none; }
 .account-form small { color: var(--muted); }
 .account-form .button { justify-self: start; }
 .login-panel .account-form .button { justify-self: stretch; }
