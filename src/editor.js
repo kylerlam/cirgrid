@@ -75,7 +75,7 @@ export function createHabitEditor({ getState, onChange }) {
   }
   const customOption = document.createElement('label');
   customOption.className = 'color-option custom-color-option';
-  customOption.innerHTML = '<input type="color" name="customColor"><span data-label="Custom color"></span>';
+  customOption.innerHTML = '<input type="color" name="customColor"><span class="custom-color-dot" aria-hidden="true"></span><span class="sr-only" data-label="Custom color"></span>';
   colors.append(customOption);
   const customColor = customOption.querySelector('input');
   const presetColors = [...colors.querySelectorAll('input[name="color"]')];

@@ -160,7 +160,7 @@ h1, h2, p { margin: 0; }
 .chart-empty { min-height: 250px; display: grid; place-items: center; padding: 24px; text-align: center; color: var(--muted-text); }
 .error-banner { border: 1px solid var(--border); border-radius: 8px; background: var(--danger-bg); color: var(--danger-text); padding: 12px 16px; margin-bottom: 18px; }
 .noscript-message { padding: 20px; }
-.habit-dialog { width: min(440px,calc(100% - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 26px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 70px #252a3026; color: var(--text); background: var(--surface); }
+.habit-dialog { width: min(740px,calc(100% - 32px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 26px; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 20px 70px #252a3026; color: var(--text); background: var(--surface); }
 .habit-dialog::backdrop { background: var(--overlay); }
 .dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
 .dialog-heading h2 { font-size: 24px; letter-spacing: -.5px; font-weight: 600; }
@@ -172,13 +172,14 @@ h1, h2, p { margin: 0; }
 .habit-form legend { padding: 0; margin-bottom: 8px; }
 .field-label { display: block; font-size: 15px; font-weight: 550; }
 .habit-input { width: 100%; min-width: 0; min-height: 44px; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px; color: var(--text); background: var(--input-bg); font-size: 18px; }
-.color-options { display: flex; flex-wrap: wrap; gap: 10px; border: 0; padding: 0; margin: 0; }
-.color-option { display: flex; align-items: center; gap: 5px; padding: 5px 0; font-size: 14px; cursor: pointer; }
-.color-option input { accent-color: var(--accent); }
-.custom-color-option { padding-inline: 5px; border-radius: 5px; }
-.custom-color-option.is-selected { background: var(--accent-soft); }
-.custom-color-option input { width: 30px; height: 26px; padding: 2px; border: 1px solid var(--border); border-radius: 5px; background: var(--surface); cursor: pointer; }
-.color-dot { display: inline-block; width: 13px; height: 13px; border-radius: 50%; background: var(--habit-color); }
+.color-options { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; border: 0; padding: 0; margin: 0; }
+.color-option { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 4px 0; font-size: 14px; line-height: 20px; white-space: nowrap; cursor: pointer; }
+.color-option input[type="radio"] { width: 16px; height: 16px; margin: 0; flex-shrink: 0; accent-color: var(--accent); }
+.custom-color-option { position: relative; width: 32px; padding: 4px; border-radius: 50%; }
+.custom-color-option input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+.custom-color-dot { width: 24px; height: 24px; border-radius: 50%; background: conic-gradient(#e24e4e, #efcf42, #62ad64, #4b94d8, #a66cce, #e24e4e); }
+.custom-color-option:is(.is-selected, :focus-within) .custom-color-dot { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--accent); }
+.color-dot { display: inline-block; width: 14px; height: 14px; flex-shrink: 0; border-radius: 50%; background: var(--habit-color); }
 .dialog-error { color: var(--danger-text); font-size: 15px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
 .dialog-actions .button-danger { margin-right: auto; }
@@ -186,6 +187,7 @@ h1, h2, p { margin: 0; }
 @media (max-width: 1180px) { .tracker-panels { grid-template-columns: minmax(0,1fr); } .grid-view { padding-top: 18px; } }
 @media (max-width: 800px) { .topbar { padding-inline: 24px; } .main-content { padding: 24px; } .week-navigation { gap: 12px; } }
 @media (max-width: 700px) {
+  .color-options { display: grid; grid-template-columns: repeat(2,max-content); }
   .app-shell { display: block; }
   .sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
   .brand { min-height: 66px; padding: 0 18px; font-size: 25px; }
@@ -230,7 +232,9 @@ h1, h2, p { margin: 0; }
   .habit-legend { column-gap: 12px; }
 }
 @media (max-width: 380px) {
+  .habit-dialog { padding: 18px; }
   .habit-schedule { grid-template-columns: 1fr; }
+  .color-options { column-gap: 8px; }
   .history-table { border-spacing: 2px; }
   .history-table thead { display: none; }
   .history-table th { width: 2.1rem; }
