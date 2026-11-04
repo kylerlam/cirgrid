@@ -142,6 +142,13 @@ h1, h2, p { margin: 0; }
 .history-calendars { max-width: 420px; margin: 0 auto; }
 .history-calendars[data-unit="year"] { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-items: start; gap: 22px; max-width: none; }
 .history-month { min-width: 0; }
+.history-day { display: flex; align-items: center; gap: 12px; width: min(100%,420px); margin: 0 auto; padding: 18px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); text-align: start; }
+.history-day:hover { background: var(--surface-soft); }
+.history-day .heatmap-mark { flex-shrink: 0; }
+.history-day-details { display: grid; gap: 3px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.history-day-details strong { font-weight: 550; }
+.history-day-details > span { font-size: 14px; color: var(--muted-text); }
+.history-day-action { font-size: 14px; color: var(--accent); }
 .history-table { table-layout: fixed; width: 100%; border-spacing: 4px; }
 .history-table caption { text-align: start; padding: 0 4px 8px; font-size: 17px; font-weight: 550; }
 .history-table th { padding: 4px 0; text-align: center; font-weight: 400; font-size: 13px; color: var(--muted-text); overflow-wrap: anywhere; }

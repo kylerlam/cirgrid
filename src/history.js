@@ -19,7 +19,9 @@ export function renderHistory(container, { state, selectedDate, today, onSelectD
   const language = getLanguage();
   const period = historyPeriod(anchor, unit);
   const monthTitle = new Intl.DateTimeFormat(language, { year: 'numeric', month: 'long' });
-  const title = unit === 'week' ? formatWeekRange(anchor, language)
+  const fullDate = new Intl.DateTimeFormat(language, { dateStyle: 'full' });
+  const title = unit === 'day' ? fullDate.format(parseDateKey(anchor))
+    : unit === 'week' ? formatWeekRange(anchor, language)
     : new Intl.DateTimeFormat(language, unit === 'year' ? { year: 'numeric' } : { year: 'numeric', month: 'long' })
       .format(parseDateKey(period.start));
   container.querySelector('#history-range').textContent = title;
@@ -37,10 +39,36 @@ export function renderHistory(container, { state, selectedDate, today, onSelectD
   }
   select.value = habit.id;
 
+  if (unit === 'day') {
+    const [statusClass, statusText] = historyStatus(state, habit, anchor, today);
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'history-day';
+    button.disabled = anchor > today;
+    Object.assign(button.dataset, { view: 'history', habitId: habit.id, date: anchor });
+    button.setAttribute('aria-label', t('View week') + ': ' + t('{0}, {1}: {2}', habit.name, title, t(statusText)));
+    const mark = document.createElement('span');
+    mark.className = 'heatmap-mark ' + statusClass;
+    mark.setAttribute('aria-hidden', 'true');
+    const details = document.createElement('span');
+    details.className = 'history-day-details';
+    const name = document.createElement('strong');
+    name.textContent = habit.name;
+    const status = document.createElement('span');
+    status.textContent = t(statusText);
+    details.append(name, status);
+    const action = document.createElement('span');
+    action.className = 'history-day-action';
+    action.textContent = t('View week');
+    button.append(mark, details, action);
+    button.addEventListener('click', () => onSelectDate(anchor));
+    heatmap.append(button);
+    return;
+  }
+
   const periods = unit === 'year'
     ? Array.from({ length: 12 }, (_, index) => historyPeriod(period.start.slice(0, 4) + '-' + String(index + 1).padStart(2, '0') + '-01', 'month'))
     : [period];
-  const fullDate = new Intl.DateTimeFormat(language, { dateStyle: 'full' });
   const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' });
   const weekDay = new Intl.DateTimeFormat(language, { month: 'short', day: 'numeric' });
   const showMonth = unit === 'week' && period.start.slice(0, 7) !== period.end.slice(0, 7);

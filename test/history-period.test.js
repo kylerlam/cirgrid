@@ -49,12 +49,29 @@ test('month and year navigation clamp days while week navigation preserves the w
   assert.equal(shiftHistoryPeriod('2027-01-07', 'week', -1), '2026-12-31');
 });
 
+test('daily periods and navigation follow real dates across leap days and month or year boundaries', () => {
+  for (const anchor of ['2028-02-29', '0001-01-01', '9999-12-31']) {
+    assert.deepEqual(historyPeriod(anchor, 'day'), { start: anchor, end: anchor });
+  }
+  assert.equal(shiftHistoryPeriod('2028-02-28', 'day', 1), '2028-02-29');
+  assert.equal(shiftHistoryPeriod('2028-02-29', 'day', 1), '2028-03-01');
+  assert.equal(shiftHistoryPeriod('2028-03-01', 'day', -1), '2028-02-29');
+  assert.equal(shiftHistoryPeriod('2027-02-28', 'day', 1), '2027-03-01');
+  assert.equal(shiftHistoryPeriod('2026-04-30', 'day', 1), '2026-05-01');
+  assert.equal(shiftHistoryPeriod('2026-12-31', 'day', 1), '2027-01-01');
+  assert.equal(shiftHistoryPeriod('2027-01-01', 'day', -1), '2026-12-31');
+  for (const anchor of ['2027-02-29', '2028-02-30', '0000-01-01', '10000-01-01']) {
+    assert.throws(() => historyPeriod(anchor, 'day'), RangeError);
+    assert.throws(() => shiftHistoryPeriod(anchor, 'day', 1), RangeError);
+  }
+});
+
 test('supported year boundaries remain valid and shifts outside them fail', () => {
   assert.deepEqual(historyPeriod('0001-01-01', 'year'), { start: '0001-01-01', end: '0001-12-31' });
   assert.deepEqual(historyPeriod('0001-01-01', 'week'), { start: '0001-01-01', end: '0001-01-07' });
   assert.deepEqual(historyPeriod('9999-12-31', 'month'), { start: '9999-12-01', end: '9999-12-31' });
   assert.equal(shiftHistoryPeriod('9999-11-30', 'month', 1), '9999-12-30');
-  for (const unit of ['year', 'month', 'week']) {
+  for (const unit of ['year', 'month', 'week', 'day']) {
     assert.throws(() => shiftHistoryPeriod('0001-01-01', unit, -1), RangeError);
     assert.throws(() => shiftHistoryPeriod('9999-12-31', unit, 1), RangeError);
   }
@@ -62,7 +79,7 @@ test('supported year boundaries remain valid and shifts outside them fail', () =
   for (const anchor of ['2027-02-29', '2028-02-30', '0000-01-01', '10000-01-01']) {
     assert.throws(() => historyPeriod(anchor, 'month'), RangeError);
   }
-  assert.throws(() => historyPeriod('2026-11-03', 'day'), RangeError);
-  assert.throws(() => shiftHistoryPeriod('2026-11-03', 'day', 1), RangeError);
+  assert.throws(() => historyPeriod('2026-11-03', 'hour'), RangeError);
+  assert.throws(() => shiftHistoryPeriod('2026-11-03', 'hour', 1), RangeError);
   assert.throws(() => shiftHistoryPeriod('2026-11-03', 'month', 0.5), TypeError);
 });
