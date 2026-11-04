@@ -55,7 +55,6 @@ export const translations = {
   "Main navigation": ["Navegación principal", "主导航", "主要導覽"],
   "Weekly tracker": ["Registro semanal", "每周打卡", "每週打卡"],
   "Habits": ["Hábitos", "习惯", "習慣"],
-  "Saved to CirGrid": ["Guardado en CirGrid", "已保存到 CirGrid", "已儲存到 CirGrid"],
   "New habit": ["Nuevo hábito", "新建习惯", "新增習慣"],
   "Previous week": ["Semana anterior", "上一周", "上一週"],
   "Next week": ["Semana siguiente", "下一周", "下一週"],
