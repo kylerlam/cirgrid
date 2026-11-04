@@ -32,6 +32,16 @@ export function createHabitEditor({ getState, onChange }) {
       <fieldset>
         <legend class="field-label" data-label="Color"></legend>
         <div class="color-options"></div>
+        <div class="custom-color-panel" id="habit-color-panel" hidden>
+          <div class="habit-field">
+            <label class="field-label" for="habit-custom-color" data-label="Color picker"></label>
+            <input class="custom-color-input" id="habit-custom-color" name="customColor" type="color">
+          </div>
+          <div class="habit-field">
+            <label class="field-label" for="habit-hex-color" data-label="Hex color"></label>
+            <input class="habit-input" id="habit-hex-color" name="hexColor" type="text" placeholder="#8866CC" maxlength="7" autocomplete="off" spellcheck="false" autocapitalize="off">
+          </div>
+        </div>
       </fieldset>
       <p class="dialog-error" role="alert" hidden></p>
       <div class="dialog-actions">
@@ -73,27 +83,69 @@ export function createHabitEditor({ getState, onChange }) {
     label.append(radio, dot, name);
     colors.append(label);
   }
-  const customOption = document.createElement('label');
+  const customOption = document.createElement('button');
+  customOption.type = 'button';
   customOption.className = 'color-option custom-color-option';
-  customOption.innerHTML = '<input type="color" name="customColor"><span class="custom-color-dot" aria-hidden="true"></span><span class="sr-only" data-label="Custom color"></span>';
+  customOption.setAttribute('aria-expanded', 'false');
+  customOption.setAttribute('aria-controls', 'habit-color-panel');
+  customOption.innerHTML = '<span class="custom-color-dot" aria-hidden="true"></span><span class="sr-only" data-label="Custom color"></span>';
   colors.append(customOption);
-  const customColor = customOption.querySelector('input');
+  const colorPanel = dialog.querySelector('.custom-color-panel');
+  const customColor = dialog.querySelector('input[name="customColor"]');
+  const hexColor = dialog.querySelector('input[name="hexColor"]');
   const presetColors = [...colors.querySelectorAll('input[name="color"]')];
 
   function updateStageField() {
     stageGoal.parentElement.hidden = !endDate.value;
   }
 
-  endDate.addEventListener('input', updateStageField);
-  customColor.addEventListener('input', () => {
+  function syncHexColor() {
+    hexColor.value = customColor.value.toUpperCase();
+    hexColor.setCustomValidity('');
+  }
+
+  function closeColorPanel() {
+    syncHexColor();
+    colorPanel.hidden = true;
+    customOption.setAttribute('aria-expanded', 'false');
+  }
+
+  function selectCustomColor() {
     for (const radio of presetColors) radio.checked = false;
     customOption.classList.add('is-selected');
+  }
+
+  endDate.addEventListener('input', updateStageField);
+  customOption.addEventListener('click', () => {
+    if (!colorPanel.hidden) return closeColorPanel();
+    syncHexColor();
+    colorPanel.hidden = false;
+    customOption.setAttribute('aria-expanded', 'true');
+    hexColor.focus();
+    hexColor.select();
+  });
+  customColor.addEventListener('input', () => {
+    syncHexColor();
+    selectCustomColor();
+  });
+  hexColor.addEventListener('input', () => {
+    const match = /^#?([0-9a-f]{6})$/i.exec(hexColor.value);
+    hexColor.setCustomValidity(match ? '' : t('Use a six-digit hex color, such as #8866CC.'));
+    if (!match) return;
+    customColor.value = `#${match[1].toLowerCase()}`;
+    selectCustomColor();
+  });
+  hexColor.addEventListener('change', () => {
+    if (hexColor.validity.valid) syncHexColor();
   });
   for (const radio of presetColors) {
-    radio.addEventListener('change', () => {
+    const selectPresetColor = () => {
       customColor.value = habitColor({ color: radio.value }).value;
       customOption.classList.remove('is-selected');
-    });
+      closeColorPanel();
+    };
+    radio.addEventListener('change', selectPresetColor);
+    radio.addEventListener('click', selectPresetColor);
   }
 
   function showError(message) {
@@ -165,7 +217,14 @@ export function createHabitEditor({ getState, onChange }) {
 
   dismiss.addEventListener('click', close);
   cancel.addEventListener('click', close);
-  dialog.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  dialog.addEventListener('cancel', event => {
+    if (saving) event.preventDefault();
+    else if (!colorPanel.hidden) {
+      event.preventDefault();
+      closeColorPanel();
+      customOption.focus();
+    }
+  });
   dialog.addEventListener('close', () => {
     const habitId = opener?.dataset?.editHabit;
     const replacement = habitId ? document.querySelector(`[data-edit-habit="${habitId}"]`) : null;
@@ -199,6 +258,7 @@ export function createHabitEditor({ getState, onChange }) {
       for (const radio of presetColors) radio.checked = radio.value === color;
       customOption.classList.toggle('is-selected', color.startsWith('#'));
       customColor.value = habitColor({ color }).value;
+      closeColorPanel();
       if (!dialog.open) dialog.showModal();
       input.focus();
       input.select();
