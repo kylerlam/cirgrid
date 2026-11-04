@@ -26,7 +26,7 @@ Before submitting a UI change, verify the real app at desktop and mobile widths:
 - Check the empty state after deleting all habits and add a habit again.
 - At 320px and 390px widths, check the date controls, habit dialog, and all seven grid columns.
 - Check for console errors, clipped content, and loss of keyboard focus.
-- Use a temporary data directory to verify first-run setup, legacy browser import, and JSON/YAML round-tripping.
+- Use a temporary data directory to verify initial sign-in and credential-hint dismissal, legacy browser import, and JSON/YAML round-tripping.
 
 Tests cover date boundaries, daylight-saving transitions, legacy data, weekly target history, account sessions, import/export, and concurrent writes. Keep corrupt saved data intact; never replace it silently.
 

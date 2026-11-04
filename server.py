@@ -7,7 +7,6 @@ from hashlib import pbkdf2_hmac, sha256
 from hmac import compare_digest
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from ipaddress import ip_address
 import json
 import mimetypes
 import os
@@ -25,6 +24,8 @@ from cirgrid_data import DECODER, MAX_IMPORT_BYTES, MAX_STATE_BYTES, dump_yaml, 
 
 ROOT = Path(__file__).resolve().parent
 COOKIE = "cirgrid_session"
+DEFAULT_USERNAME = "admin"
+DEFAULT_PASSWORD = "admin123"
 SESSION_SECONDS = 30 * 24 * 60 * 60
 LOGIN_WINDOW = 300
 LOGIN_ATTEMPTS = 10
@@ -72,28 +73,47 @@ class Store:
         self.directory.mkdir(parents=True, exist_ok=True)
         self.path = self.directory / "cirgrid.sqlite3"
         self.export_lock = threading.Lock()
-        with closing(self.connect()) as db:
-            db.executescript("""
-                PRAGMA journal_mode = WAL;
-                CREATE TABLE IF NOT EXISTS account (
+        with closing(self.connect()) as db, db:
+            deadline = time.monotonic() + 15
+            while True:
+                try:
+                    db.execute("PRAGMA journal_mode = WAL")
+                    break
+                except sqlite3.OperationalError as error:
+                    if error.sqlite_errorcode != sqlite3.SQLITE_BUSY or time.monotonic() >= deadline:
+                        raise
+                    time.sleep(0.05)
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("""CREATE TABLE IF NOT EXISTS account (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
-                    username TEXT NOT NULL, salt BLOB NOT NULL, password BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS sessions (
+                    username TEXT NOT NULL, salt BLOB NOT NULL, password BLOB NOT NULL,
+                    password_changed INTEGER NOT NULL DEFAULT 0
+                )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS sessions (
                     token TEXT PRIMARY KEY, expires INTEGER NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS tracker (
+                )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS tracker (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     revision INTEGER NOT NULL, state TEXT NOT NULL
-                );
-            """)
+                )""")
+            columns = {row[1] for row in db.execute("PRAGMA table_info(account)")}
+            if "password_changed" not in columns:
+                db.execute("ALTER TABLE account ADD COLUMN password_changed INTEGER NOT NULL DEFAULT 0")
+                account = db.execute("SELECT salt, password FROM account WHERE id = 1").fetchone()
+                if account and not compare_digest(password_hash(DEFAULT_PASSWORD, account[0]), account[1]):
+                    db.execute("UPDATE account SET password_changed = 1 WHERE id = 1")
+            if db.execute("SELECT 1 FROM account WHERE id = 1").fetchone() is None:
+                salt = secrets.token_bytes(16)
+                db.execute("INSERT INTO account (id, username, salt, password) VALUES (1, ?, ?, ?)",
+                           (DEFAULT_USERNAME, salt, password_hash(DEFAULT_PASSWORD, salt)))
 
     def connect(self):
         return sqlite3.connect(self.path, timeout=15)
 
-    def has_account(self):
+    def default_credentials(self):
         with closing(self.connect()) as db:
-            return db.execute("SELECT 1 FROM account").fetchone() is not None
+            account = db.execute("SELECT username, password_changed FROM account WHERE id = 1").fetchone()
+            return {"username": account[0], "password": DEFAULT_PASSWORD} if not account[1] else None
 
     def new_session(self, db):
         token = secrets.token_urlsafe(32)
@@ -111,25 +131,12 @@ class Store:
                 (token_hash(token), int(time.time()))).fetchone()
             return row[0] if row else None
 
-    def setup(self, data):
-        username = username_value(data.get("username"))
-        password = credential(data.get("password"), "PASSWORD", 12, 256)
-        salt = secrets.token_bytes(16)
-        digest = password_hash(password, salt)
-        with closing(self.connect()) as db, db:
-            result = db.execute("INSERT OR IGNORE INTO account VALUES (1, ?, ?, ?)", (username, salt, digest))
-            if result.rowcount == 0:
-                raise RequestError("SETUP_COMPLETE", "The CirGrid account already exists.", 409)
-            return username, self.new_session(db)
-
     def login(self, data):
         username = credential(data.get("username"), "USERNAME", 0, 64)
         password = credential(data.get("password"), "PASSWORD", 0, 256)
         with closing(self.connect()) as db, db:
             db.execute("BEGIN IMMEDIATE")
             account = db.execute("SELECT username, salt, password FROM account").fetchone()
-            if account is None:
-                raise RequestError("SETUP_REQUIRED", "Create the CirGrid account first.", 409)
             valid_password = compare_digest(password_hash(password, account[1]), account[2])
             if not compare_digest(username.encode(), account[0].encode()) or not valid_password:
                 raise RequestError("INVALID_CREDENTIALS", "Invalid username or password.", 401)
@@ -155,11 +162,13 @@ class Store:
             _, salt, digest = db.execute("SELECT username, salt, password FROM account").fetchone()
             if not compare_digest(password_hash(current, salt), digest):
                 raise RequestError("INVALID_CURRENT_PASSWORD", "The current password is incorrect.")
-            if password:
+            changed = bool(password) and not compare_digest(password.encode(), current.encode())
+            if changed:
                 salt = secrets.token_bytes(16)
                 digest = password_hash(password, salt)
-            db.execute("UPDATE account SET username = ?, salt = ?, password = ? WHERE id = 1",
-                       (username, salt, digest))
+            db.execute("""UPDATE account SET username = ?, salt = ?, password = ?,
+                       password_changed = CASE WHEN ? THEN 1 ELSE password_changed END WHERE id = 1""",
+                       (username, salt, digest, changed))
             db.execute("DELETE FROM sessions")
             return username, self.new_session(db)
 
@@ -218,31 +227,17 @@ class Store:
         return yaml
 
 
-def loopback(host):
-    if host.lower() == "localhost":
-        return True
-    try:
-        return ip_address(host).is_loopback
-    except ValueError:
-        return False
-
-
-def session_data(username=None, *, needs_setup=False, setup_token_required=False):
-    value = {"authenticated": username is not None, "needsSetup": needs_setup}
+def session_data(username=None):
+    value = {"authenticated": username is not None, "needsSetup": False}
     if username is not None:
         value["username"] = username
-    if needs_setup:
-        value["setupTokenRequired"] = setup_token_required
     return value
 
 
-def make_server(host, port, store, *, secure_cookie=False, setup_token=None):
+def make_server(host, port, store, *, secure_cookie=False):
     attempts = defaultdict(int)
     attempts_lock = threading.Lock()
     window = None
-    if setup_token is None and not loopback(host) and not store.has_account():
-        setup_token = secrets.token_urlsafe(24)
-        print(f"CirGrid setup token: {setup_token}", flush=True)
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "CirGrid"
@@ -336,32 +331,22 @@ def make_server(host, port, store, *, secure_cookie=False, setup_token=None):
                     raise RequestError("RATE_LIMITED", "Too many attempts. Try again in a few minutes.", 429)
                 attempts[client] += 1
 
-        def provision_account(self, data):
-            if store.has_account():
-                raise RequestError("SETUP_COMPLETE", "The CirGrid account already exists.", 409)
-            if setup_token is not None:
-                value = credential(data.get("setupToken", ""), "SETUP_TOKEN", 0, 512)
-                if not compare_digest(value.encode(), setup_token.encode()):
-                    raise RequestError("INVALID_SETUP_TOKEN", "Enter the setup token from the server.", 403)
-            else:
-                authority = urlsplit(f"//{self.headers.get('Host', '')}").hostname or ""
-                if not loopback(authority) or not loopback(self.client_address[0]):
-                    raise RequestError("LOCAL_SETUP_REQUIRED", "Set up the account locally or configure a setup token.", 403)
-            return store.setup(data)
-
         def api(self, path, query, token, username):
             method = "GET" if self.command == "HEAD" else self.command
             if method == "GET":
                 if path == "/api/health":
                     return self.json({"ok": True})
                 if path == "/api/session":
-                    return self.json(session_data(username, needs_setup=not store.has_account(),
-                                                  setup_token_required=setup_token is not None))
+                    data = session_data(username)
+                    credentials = store.default_credentials()
+                    if credentials is not None:
+                        data["defaultCredentials"] = credentials
+                    return self.json(data)
             if method == "POST":
-                if path in ("/api/setup", "/api/login"):
+                if path == "/api/login":
                     data = self.body()
                     self.limit_sign_in()
-                    user, new_token = self.provision_account(data) if path == "/api/setup" else store.login(data)
+                    user, new_token = store.login(data)
                     return self.json(session_data(user), Set_Cookie=self.set_cookie(new_token))
                 if path == "/api/logout":
                     self.body()
@@ -470,11 +455,8 @@ if __name__ == "__main__":
     secure = os.environ.get("SESSION_COOKIE_SECURE", "false").lower()
     if secure not in ("true", "false", "1", "0", ""):
         raise SystemExit("SESSION_COOKIE_SECURE must be true or false.")
-    token = os.environ.get("CIRGRID_SETUP_TOKEN") or None
-    if token is not None and not 16 <= len(token) <= 512:
-        raise SystemExit("CIRGRID_SETUP_TOKEN must contain 16 to 512 characters.")
     store = Store(os.environ.get("DATA_DIR", ROOT / "data"))
-    with make_server(host, port, store, secure_cookie=secure in ("true", "1"), setup_token=token) as server:
+    with make_server(host, port, store, secure_cookie=secure in ("true", "1")) as server:
         print(f"CirGrid is running at http://{host}:{server.server_port}", flush=True)
         try:
             server.serve_forever()

@@ -1,13 +1,16 @@
 """Exercise the real CirGrid routes with a temporary SQLite database."""
 
 from http.client import HTTPConnection
+from contextlib import closing
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
+import sqlite3
 from tempfile import TemporaryDirectory
 from threading import Thread
 import unittest
 
-from server import Store, make_server
+from server import Store, make_server, password_hash
 
 
 STATE = {
@@ -19,8 +22,7 @@ STATE = {
     }],
     "completions": {"2026-11-01": {"reading": "late"}},
 }
-ACCOUNT = {"username": "owner", "password": "testing-password-1"}
-SETUP_TOKEN = "integration-setup-token"
+ACCOUNT = {"username": "admin", "password": "admin123"}
 
 
 class ServerTest(unittest.TestCase):
@@ -31,7 +33,7 @@ class ServerTest(unittest.TestCase):
         self.start()
 
     def start(self):
-        server = make_server("127.0.0.1", 0, Store(self.directory), setup_token=SETUP_TOKEN)
+        server = make_server("127.0.0.1", 0, Store(self.directory))
         self.addCleanup(server.server_close)
         worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         worker.start()
@@ -59,10 +61,10 @@ class ServerTest(unittest.TestCase):
         finally:
             connection.close()
 
-    def setup_account(self):
-        status, headers, data = self.request("POST", "/api/setup", ACCOUNT | {"setupToken": SETUP_TOKEN})
+    def login(self):
+        status, headers, data = self.request("POST", "/api/login", ACCOUNT)
         self.assertEqual(status, 200)
-        self.assertEqual(data, {"authenticated": True, "needsSetup": False, "username": "owner"})
+        self.assertEqual(data, {"authenticated": True, "needsSetup": False, "username": "admin"})
         cookie = headers["Set-Cookie"]
         self.assertIn("HttpOnly", cookie)
         self.assertIn("SameSite=Strict", cookie)
@@ -71,13 +73,13 @@ class ServerTest(unittest.TestCase):
     def test_single_account_and_session_lifecycle(self):
         self.assertEqual(self.request("GET", "/")[0], 302)
         self.assertEqual(self.request("GET", "/api/state")[0], 401)
-        self.assertEqual(self.request("GET", "/api/session")[2],
-                         {"authenticated": False, "needsSetup": True, "setupTokenRequired": True})
-        self.assertEqual(self.request("POST", "/api/setup", ACCOUNT)[0], 403)
-        self.assertEqual(self.request("POST", "/api/setup", ACCOUNT | {"setupToken": SETUP_TOKEN},
+        self.assertEqual(self.request("GET", "/api/session")[2], {
+            "authenticated": False, "needsSetup": False, "defaultCredentials": ACCOUNT,
+        })
+        self.assertEqual(self.request("POST", "/api/login", ACCOUNT,
                                       headers={"Origin": "https://another.example"})[0], 403)
-        cookie = self.setup_account()
-        self.assertEqual(self.request("POST", "/api/setup", ACCOUNT | {"setupToken": SETUP_TOKEN})[0], 409)
+        self.assertEqual(self.request("POST", "/api/setup", ACCOUNT)[0], 401)
+        cookie = self.login()
         self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2], {"state": None, "revision": 0})
         self.assertEqual(self.request("GET", "/data/cirgrid.sqlite3", cookie=cookie)[0], 404)
         status, headers, _ = self.request("POST", "/api/login", ACCOUNT)
@@ -87,14 +89,74 @@ class ServerTest(unittest.TestCase):
             "username": "renamed", "currentPassword": ACCOUNT["password"], "password": "a-different-password",
         }, cookie=cookie)
         self.assertEqual((status, body["username"]), (200, "renamed"))
+        self.assertNotIn("defaultCredentials", self.request("GET", "/api/session")[2])
+        self.start()
+        self.assertNotIn("defaultCredentials", self.request("GET", "/api/session")[2])
         self.assertEqual(self.request("GET", "/api/state", cookie=other_cookie)[0], 401)
         self.assertEqual(self.request("POST", "/api/login", ACCOUNT)[0], 401)
         cookie = headers["Set-Cookie"].split(";", 1)[0]
         self.assertEqual(self.request("POST", "/api/logout", {}, cookie=cookie)[0], 200)
         self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[0], 401)
 
+    def test_default_hint_survives_rename_and_failed_changes(self):
+        cookie = self.login()
+        for changes in (
+            {"currentPassword": "wrong", "password": "a-different-password"},
+            {"currentPassword": ACCOUNT["password"], "password": "short"},
+            {"currentPassword": ACCOUNT["password"], "password": ACCOUNT["password"]},
+        ):
+            self.assertEqual(self.request("POST", "/api/account", {"username": "renamed", **changes},
+                                          cookie=cookie)[0], 400)
+            self.assertEqual(self.request("GET", "/api/session")[2]["defaultCredentials"], ACCOUNT)
+        status, headers, _ = self.request("POST", "/api/account", {
+            "username": "renamed", "currentPassword": ACCOUNT["password"], "password": "",
+        }, cookie=cookie)
+        self.assertEqual(status, 200)
+        cookie = headers["Set-Cookie"].split(";", 1)[0]
+        expected = {"username": "renamed", "password": ACCOUNT["password"]}
+        self.assertEqual(self.request("GET", "/api/session")[2]["defaultCredentials"], expected)
+        self.start()
+        self.assertEqual(self.request("GET", "/api/session")[2]["defaultCredentials"], expected)
+        self.assertEqual(self.request("POST", "/api/login", expected)[0], 200)
+        self.assertEqual(self.request("POST", "/api/account", {
+            "username": "renamed", "currentPassword": ACCOUNT["password"], "password": "a-different-password",
+        }, cookie=cookie)[0], 200)
+        self.assertNotIn("defaultCredentials", self.request("GET", "/api/session")[2])
+        self.start()
+        self.assertNotIn("defaultCredentials", self.request("GET", "/api/session")[2])
+
+    def test_legacy_accounts_and_habits_survive_initialization(self):
+        for password, show_hint in (("admin123", True), ("already-custom-password", False)):
+            with self.subTest(password=password), TemporaryDirectory() as directory:
+                path = Path(directory) / "cirgrid.sqlite3"
+                salt = b"0123456789abcdef"
+                with closing(sqlite3.connect(path)) as db, db:
+                    db.executescript("""
+                        CREATE TABLE account (id INTEGER PRIMARY KEY CHECK(id = 1),
+                            username TEXT NOT NULL, salt BLOB NOT NULL, password BLOB NOT NULL);
+                        CREATE TABLE tracker (id INTEGER PRIMARY KEY CHECK(id = 1),
+                            revision INTEGER NOT NULL, state TEXT NOT NULL);
+                    """)
+                    db.execute("INSERT INTO account VALUES (1, ?, ?, ?)",
+                               ("existing", salt, password_hash(password, salt)))
+                    db.execute("INSERT INTO tracker VALUES (1, 7, ?)", (json.dumps(STATE),))
+                migrated = Store(directory)
+                self.assertEqual(migrated.read_state(), {"state": STATE, "revision": 7})
+                self.assertEqual(bool(migrated.default_credentials()), show_hint)
+                self.assertEqual(migrated.login({"username": "existing", "password": password})[0], "existing")
+                restarted = Store(directory)
+                self.assertEqual(restarted.read_state(), {"state": STATE, "revision": 7})
+                self.assertEqual(bool(restarted.default_credentials()), show_hint)
+
+    def test_parallel_initialization_creates_one_account(self):
+        with TemporaryDirectory() as directory, ThreadPoolExecutor(max_workers=4) as workers:
+            stores = list(workers.map(Store, [directory] * 4))
+            self.assertTrue(all(store.default_credentials() == ACCOUNT for store in stores))
+            with closing(stores[0].connect()) as db:
+                self.assertEqual(db.execute("SELECT count(*) FROM account").fetchone()[0], 1)
+
     def test_revision_backup_and_legacy_import(self):
-        cookie = self.setup_account()
+        cookie = self.login()
         status, _, backup = self.request("GET", "/api/export?format=json", cookie=cookie)
         self.assertEqual(status, 200)
         self.assertEqual([habit["id"] for habit in backup["state"]["habits"]], ["sunscreen", "exercise", "reading"])

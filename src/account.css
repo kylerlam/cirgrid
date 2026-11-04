@@ -34,6 +34,19 @@
 .login-panel .account-form .button { justify-self: stretch; }
 .account-message { margin-top: 10px; overflow-wrap: anywhere; }
 .account-message.is-error, #login-error { color: var(--danger-text); }
+.default-credentials {
+  margin-top: 22px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  font-size: 14px;
+}
+.default-credentials h2 { margin: 0; font-size: 18px; }
+.default-credentials dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 12px; margin: 12px 0; }
+.default-credentials dt { color: var(--muted); }
+.default-credentials dd { margin: 0; overflow-wrap: anywhere; }
+.default-credentials p { color: var(--muted); }
 .settings-dialog {
   width: min(480px, calc(100% - 24px));
   max-height: calc(100dvh - 24px);

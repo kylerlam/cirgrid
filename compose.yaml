@@ -3,7 +3,6 @@ services:
   app:
     build: .
     environment:
-      CIRGRID_SETUP_TOKEN: "${CIRGRID_SETUP_TOKEN:-}"
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
     ports:
       - "${CIRGRID_BIND_ADDRESS:-127.0.0.1}:${CIRGRID_PORT:-4173}:8080"

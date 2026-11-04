@@ -23,10 +23,17 @@
       <form id="login-form" class="account-form">
         <label><span data-i18n="Username">Username</span><input name="username" autocomplete="username" required maxlength="64"></label>
         <label><span data-i18n="Password">Password</span><input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
-        <label id="setup-token" hidden><span data-i18n="Setup token">Setup token</span><input name="setupToken" autocomplete="off" maxlength="256"><small data-i18n="Find the setup token in the server logs.">Find the setup token in the server logs.</small></label>
         <button class="button button-primary" type="submit" data-i18n="Sign in" disabled>Sign in</button>
       </form>
       <p id="login-error" class="account-message" role="alert" hidden></p>
+      <section id="default-credentials" class="default-credentials" aria-labelledby="first-sign-in-title" hidden>
+        <h2 id="first-sign-in-title" data-i18n="First sign-in">First sign-in</h2>
+        <dl>
+          <dt data-i18n="Username">Username</dt><dd><code id="default-username"></code></dd>
+          <dt data-i18n="Password">Password</dt><dd><code id="default-password"></code></dd>
+        </dl>
+        <p data-i18n="After signing in, change your password in Settings → Account.">After signing in, change your password in Settings → Account.</p>
+      </section>
     </section>
   </main>
 </body>

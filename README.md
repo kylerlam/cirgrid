@@ -18,18 +18,17 @@ Use Python 3.13. No package installation or frontend build is required.
 python3 server.py
 ```
 
-Open **http://127.0.0.1:4173** and create your single CirGrid account. Choose a password of at least 12 characters. Subsequent visits use the sign-in screen. You can change the username or password in **Settings → Account**.
+Open **http://127.0.0.1:4173** and sign in with the initial account, **admin / admin123**, shown below the sign-in form. Change the password in **Settings → Account** after signing in. New passwords must contain at least 12 characters. The initial-credentials panel disappears after a successful change to a different password. Username-only changes keep the panel visible with the current username.
 
-The default server binds to the loopback interface. Set `HOST`, `PORT`, or `DATA_DIR` to change the listener or database directory. For a non-loopback listener, the server logs a setup token on first startup. You can also supply `CIRGRID_SETUP_TOKEN` explicitly.
+The default server binds to the loopback interface. Set `HOST`, `PORT`, or `DATA_DIR` to change the listener or database directory. The initial account is created automatically when the database has no account.
 
 ## Run with Docker Compose
 
 ```sh
 docker compose up --build -d
-docker compose logs app
 ```
 
-Open **http://127.0.0.1:4173** and enter the setup token from the logs when creating your account. Compose stores SQLite and the export snapshot in the `cirgrid-data` volume. Set `CIRGRID_PORT` to change the host port. For an HTTPS reverse proxy, preserve the public Host header and set `SESSION_COOKIE_SECURE=true`. The default published address is loopback and can be changed with `CIRGRID_BIND_ADDRESS`.
+Open **http://127.0.0.1:4173** and sign in using the initial account shown below the form. Compose stores SQLite and the export snapshot in the `cirgrid-data` volume. Set `CIRGRID_PORT` to change the host port. For an HTTPS reverse proxy, preserve the public Host header and set `SESSION_COOKIE_SECURE=true`. The default published address is loopback and can be changed with `CIRGRID_BIND_ADDRESS`.
 
 ## Bring over browser records
 
