@@ -2,6 +2,7 @@ import { request } from './api.js';
 import { applyPreferences, t } from './preferences.js';
 import { addPasswordToggle, createSettings } from './settings.js';
 
+const destination = location.hash === '#habit-history' ? '/#habit-history' : '/';
 const form = document.getElementById('login-form');
 const submit = form.querySelector('[type=submit]');
 addPasswordToggle(form.elements.password);
@@ -17,7 +18,7 @@ function showError(message) {
 
 try {
   const session = await request('/api/session');
-  if (session.authenticated) location.replace('/');
+  if (session.authenticated) location.replace(destination);
   else {
     if (session.defaultCredentials) {
       document.getElementById('default-username').textContent = session.defaultCredentials.username;
@@ -37,7 +38,7 @@ form.addEventListener('submit', async event => {
   const data = Object.fromEntries(new FormData(form));
   try {
     await request('/api/login', { method: 'POST', data });
-    location.replace('/');
+    location.replace(destination);
   } catch (failure) {
     showError(failure.message);
     submit.disabled = false;

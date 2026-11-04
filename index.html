@@ -13,7 +13,7 @@
   <script type="module" src="/src/app.js"></script>
 </head>
 <body>
-  <a class="skip-link" href="#tracker" data-i18n="Skip to tracker">Skip to tracker</a>
+  <a class="skip-link" href="#main-content" data-i18n="Skip to content">Skip to content</a>
   <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <symbol id="icon-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18M8 15h1M13 15h1M8 18h1M13 18h1"/></symbol>
     <symbol id="icon-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
@@ -36,8 +36,8 @@
       <div class="sidebar-footer"><button id="open-settings" class="button button-secondary settings-button" type="button" data-i18n="Settings">Settings</button><span class="storage-note"><svg class="icon" aria-hidden="true"><use href="#icon-storage"/></svg><span data-i18n="Saved to CirGrid">Saved to CirGrid</span></span><a class="source-link" href="https://github.com/kylerlam/cirgrid" target="_blank" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#icon-github"/></svg>GitHub</a></div>
     </aside>
     <div class="workspace">
-      <header class="topbar"><h1 data-i18n="Weekly tracker">Weekly tracker</h1><button id="new-habit" class="button button-primary" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg><span data-i18n="New habit">New habit</span></button></header>
-      <main id="tracker" class="main-content">
+      <header class="topbar"><h1 id="page-title" tabindex="-1" data-i18n="Weekly tracker">Weekly tracker</h1><button id="new-habit" class="button button-primary" type="button"><svg class="icon" aria-hidden="true"><use href="#icon-plus"/></svg><span data-i18n="New habit">New habit</span></button></header>
+      <main id="main-content" class="main-content" tabindex="-1">
         <div id="storage-error" class="error-banner" role="alert" hidden></div>
         <section id="migration-notice" class="migration-notice" aria-label="Import browser records" data-i18n-label="Import browser records" hidden>
           <p data-i18n="CirGrid found check-ins and habits saved by the previous version in this browser.">CirGrid found check-ins and habits saved by the previous version in this browser.</p>
@@ -46,6 +46,7 @@
             <button id="download-browser" class="button button-secondary" type="button" data-i18n="Download browser backup">Download browser backup</button>
           </div>
         </section>
+        <section id="tracker" aria-labelledby="week-range">
         <div class="week-toolbar">
           <div class="week-navigation"><h2 id="week-range" tabindex="-1"></h2><div class="week-arrows"><button id="previous-week" class="button button-secondary icon-button" type="button" aria-label="Previous week" data-i18n-label="Previous week"><svg class="icon" aria-hidden="true"><use href="#icon-left"/></svg></button><button id="next-week" class="button button-secondary icon-button" type="button" aria-label="Next week" data-i18n-label="Next week"><svg class="icon" aria-hidden="true"><use href="#icon-right"/></svg></button></div></div>
           <div class="date-controls"><label class="sr-only" for="selected-date" data-i18n="Choose a date">Choose a date</label><input id="selected-date" class="date-input" type="date"><button id="today" class="button button-secondary" type="button" data-i18n="Today">Today</button></div>
@@ -55,16 +56,35 @@
           <section class="tracker-panel" aria-labelledby="grid-heading"><div class="panel-heading"><h2 id="grid-heading" data-i18n="Grid tracker">Grid tracker</h2><p data-i18n="One row per habit">One row per habit</p></div><div id="grid-tracker"></div></section>
         </div>
         <div class="tracker-key" aria-label="Completion key" data-i18n-label="Completion key"><span><span class="key-cell is-complete"><svg class="icon" aria-hidden="true"><use href="#icon-check"/></svg></span><span data-i18n="Completed">Completed</span></span><span><span class="key-cell"></span><span data-i18n="Not checked in">Not checked in</span></span><span><span class="key-cell is-makeup"></span><span data-i18n="Backfilled">Backfilled</span></span></div>
-        <p id="status" class="status-message" role="status" aria-live="polite"></p>
-        <section id="habit-history" class="tracker-panel history-panel" aria-labelledby="history-heading">
+        </section>
+        <section id="habit-history" class="tracker-panel history-panel" aria-labelledby="history-range" hidden>
           <div class="history-header">
             <div class="panel-heading">
-              <h2 id="history-heading" data-i18n="Habit history">Habit history</h2>
-              <p data-i18n="Last 12 weeks. Select a day to open its week.">Last 12 weeks. Select a day to open its week.</p>
+              <h2 id="history-range" tabindex="-1"></h2>
+              <p data-i18n="Select a day to view or make up check-ins in its week.">Select a day to view or make up check-ins in its week.</p>
             </div>
             <div class="history-filter">
               <label for="history-habit" class="field-label" data-i18n="Habit">Habit</label>
               <select id="history-habit" class="habit-input"></select>
+            </div>
+          </div>
+          <div class="history-toolbar">
+            <div class="habit-field history-unit-field">
+              <label for="history-unit" class="field-label" data-i18n="View by">View by</label>
+              <select id="history-unit" class="habit-input">
+                <option value="year" data-i18n="Year">Year</option>
+                <option value="month" data-i18n="Month" selected>Month</option>
+                <option value="week" data-i18n="Week">Week</option>
+              </select>
+            </div>
+            <div class="habit-field history-date-field">
+              <label for="history-date" class="field-label" data-i18n="Go to date">Go to date</label>
+              <input id="history-date" class="habit-input" type="date" min="0001-01-01" max="9999-12-31" required>
+            </div>
+            <div class="history-period-actions">
+              <button id="history-previous" class="button button-secondary icon-button" type="button" aria-label="Previous period" data-i18n-label="Previous period"><svg class="icon" aria-hidden="true"><use href="#icon-left"/></svg></button>
+              <button id="history-current" class="button button-secondary" type="button" data-i18n="Current period">Current period</button>
+              <button id="history-next" class="button button-secondary icon-button" type="button" aria-label="Next period" data-i18n-label="Next period"><svg class="icon" aria-hidden="true"><use href="#icon-right"/></svg></button>
             </div>
           </div>
           <div id="history-heatmap"></div>
@@ -75,6 +95,7 @@
             <span><span class="heatmap-mark is-ended" aria-hidden="true"></span><span data-i18n="Stage ended">Stage ended</span></span>
           </div>
         </section>
+        <p id="status" class="status-message" role="status" aria-live="polite"></p>
       </main>
     </div>
   </div>

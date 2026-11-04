@@ -4,6 +4,7 @@ import {
 } from './model.js';
 import { renderCircle, renderGrid } from './views.js';
 import { renderHistory } from './history.js';
+import { historyPeriod, shiftHistoryPeriod } from './history-period.js';
 import { createHabitEditor } from './editor.js';
 import { request } from './api.js';
 import { applyPreferences, getLanguage, t } from './preferences.js';
@@ -11,16 +12,23 @@ import { createSettings } from './settings.js';
 
 const elements = Object.fromEntries(['habit-list', 'new-habit', 'week-range', 'previous-week', 'next-week',
   'selected-date', 'today', 'circle-tracker', 'grid-tracker', 'storage-error', 'status', 'migration-notice',
-  'migrate-browser', 'download-browser', 'habit-history', 'history-habit'].map(id => [id, document.getElementById(id)]));
+  'migrate-browser', 'download-browser', 'tracker', 'habit-history', 'history-habit', 'history-unit',
+  'history-date', 'history-previous', 'history-next', 'history-current'].map(id => [id, document.getElementById(id)]));
 let state = createInitialState();
 let revision = 0;
 let selectedDate = localDateKey();
+let historyUnit = 'month';
+let historyAnchor = localDateKey();
 let pending = Promise.resolve();
 const changes = typeof BroadcastChannel === 'function' ? new BroadcastChannel('cirgrid-server-state') : null;
 
 function showError(message) {
   elements['storage-error'].textContent = t(message);
   elements['storage-error'].hidden = false;
+}
+
+function showSignIn() {
+  location.replace(location.hash === '#habit-history' ? '/login#habit-history' : '/login');
 }
 
 function accept(snapshot) {
@@ -31,7 +39,7 @@ function accept(snapshot) {
 }
 
 function reportFailure(error) {
-  if (error.status === 401) location.replace('/login');
+  if (error.status === 401) showSignIn();
   else if (error instanceof TypeError || error instanceof RangeError) elements.status.textContent = t(error.message);
   else showError(error.message);
 }
@@ -116,6 +124,28 @@ function renderHabits() {
   });
 }
 
+function showPage(focus = false) {
+  const history = location.hash === '#habit-history';
+  elements.tracker.hidden = history;
+  elements['habit-history'].hidden = !history;
+  const title = document.getElementById('page-title');
+  title.dataset.i18n = history ? 'Habit history' : 'Weekly tracker';
+  title.textContent = t(title.dataset.i18n);
+  const pageTitle = document.querySelector('title');
+  pageTitle.dataset.i18n = history ? 'Habit history' : 'Habit tracker';
+  pageTitle.textContent = 'CirGrid — ' + t(pageTitle.dataset.i18n);
+  for (const link of document.querySelectorAll('.navigation .nav-item')) {
+    const active = link.hash === (history ? '#habit-history' : '#tracker');
+    link.classList.toggle('is-active', active);
+    if (active) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+  if (focus) {
+    (history ? title : elements['week-range']).focus({ preventScroll: true });
+    window.scrollTo({ top: 0 });
+  }
+}
+
 function render() {
   const active = document.activeElement;
   const focus = active?.dataset?.view ? { view: active.dataset.view, habitId: active.dataset.habitId, date: active.dataset.date } : null;
@@ -127,7 +157,19 @@ function render() {
   renderHabits();
   renderCircle(elements['circle-tracker'], options);
   renderGrid(elements['grid-tracker'], options);
-  renderHistory(elements['habit-history'], { state, selectedDate, today, onSelectDate: jumpToWeek });
+  elements['history-unit'].value = historyUnit;
+  elements['history-date'].value = historyAnchor;
+  elements['history-date'].max = today;
+  for (const [id, offset] of [['history-previous', -1], ['history-next', 1]]) {
+    try {
+      const next = shiftHistoryPeriod(historyAnchor, historyUnit, offset);
+      elements[id].disabled = historyPeriod(next, historyUnit).start > today;
+    } catch {
+      elements[id].disabled = true;
+    }
+  }
+  renderHistory(elements['habit-history'], { state, selectedDate, today, unit: historyUnit, anchor: historyAnchor, onSelectDate: jumpToWeek });
+  showPage();
   if (focus) {
     const cell = [...document.querySelectorAll('[data-view]')].find(node => node.dataset.view === focus.view && node.dataset.habitId === focus.habitId && node.dataset.date === focus.date);
     cell?.focus({ preventScroll: true });
@@ -150,9 +192,23 @@ function selectDate(dateKey) {
 
 function jumpToWeek(dateKey) {
   selectDate(dateKey);
+  location.hash = '#tracker';
+  showPage();
   const heading = elements['week-range'];
   heading.focus({ preventScroll: true });
   heading.scrollIntoView({ block: 'start' });
+}
+
+function selectHistoryDate(dateKey) {
+  try {
+    historyPeriod(dateKey, historyUnit);
+    if (dateKey > localDateKey()) throw new RangeError('Choose a date on or before today.');
+    historyAnchor = dateKey;
+    render();
+  } catch (error) {
+    elements['history-date'].value = historyAnchor;
+    elements.status.textContent = t(error.message);
+  }
 }
 
 function shiftWeek(offset) {
@@ -270,7 +326,7 @@ async function start() {
   applyPreferences();
   const session = await request('/api/session');
   if (!session.authenticated) {
-    location.replace('/login');
+    showSignIn();
     return;
   }
   const snapshot = await request('/api/state');
@@ -278,7 +334,7 @@ async function start() {
     username: session.username, onImport: importFile, onDownload: exportFile,
     onSignOut: async () => {
       await request('/api/logout', { method: 'POST', data: {} });
-      location.replace('/login');
+      showSignIn();
       return 'Signed out.';
     },
   });
@@ -289,6 +345,20 @@ async function start() {
   elements['today'].addEventListener('click', () => selectDate(localDateKey()));
   elements['selected-date'].addEventListener('change', event => selectDate(event.target.value));
   elements['history-habit'].addEventListener('change', render);
+  elements['history-unit'].addEventListener('change', event => {
+    historyUnit = event.target.value;
+    render();
+  });
+  elements['history-date'].addEventListener('change', event => selectHistoryDate(event.target.value));
+  for (const [id, offset] of [['history-previous', -1], ['history-next', 1]]) {
+    elements[id].addEventListener('click', () => selectHistoryDate(shiftHistoryPeriod(historyAnchor, historyUnit, offset)));
+  }
+  elements['history-current'].addEventListener('click', () => selectHistoryDate(localDateKey()));
+  document.querySelector('.skip-link').addEventListener('click', event => {
+    event.preventDefault();
+    document.getElementById('main-content').focus();
+  });
+  window.addEventListener('hashchange', () => showPage(true));
   window.addEventListener('languagechange', render);
   window.addEventListener('focus', refresh);
   changes?.addEventListener('message', refresh);
@@ -299,7 +369,7 @@ async function start() {
 }
 
 start().catch(error => {
-  if (error.status === 401) location.replace('/login');
+  if (error.status === 401) showSignIn();
   else {
     const startup = document.getElementById('startup-error');
     startup.textContent = t('CirGrid could not connect. Reload the page to try again.');
