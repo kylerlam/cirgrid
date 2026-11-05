@@ -19,7 +19,7 @@ import threading
 import time
 from urllib.parse import parse_qs, unquote, urlsplit
 
-from cirgrid_data import DECODER, MAX_IMPORT_BYTES, MAX_STATE_BYTES, dump_yaml, read_backup, validate_state
+from cirgrid_data import DECODER, MAX_IMPORT_BYTES, MAX_STATE_BYTES, dump_yaml, migrate_state, read_backup, validate_state
 
 
 ROOT = Path(__file__).resolve().parent
@@ -106,6 +106,13 @@ class Store:
                 salt = secrets.token_bytes(16)
                 db.execute("INSERT INTO account (id, username, salt, password) VALUES (1, ?, ?, ?)",
                            (DEFAULT_USERNAME, salt, password_hash(DEFAULT_PASSWORD, salt)))
+            tracker = db.execute("SELECT state FROM tracker WHERE id = 1").fetchone()
+            if tracker:
+                previous = json.loads(tracker[0])
+                state = migrate_state(previous)
+                if state is not previous:
+                    db.execute("UPDATE tracker SET revision = revision + 1, state = ? WHERE id = 1",
+                               (json.dumps(state, ensure_ascii=False, separators=(",", ":")),))
 
     def connect(self):
         return sqlite3.connect(self.path, timeout=15)
@@ -203,7 +210,7 @@ class Store:
         with self.export_lock:
             state = self.read_state()["state"]
             if state is None:
-                state = {"version": 2, "habits": [], "completions": {}}
+                state = {"version": 3, "habits": [], "completions": {}}
             payload = {"format": "cirgrid-export", "state": state}
             yaml = dump_yaml(payload).encode()
             # A completed download and the server snapshot describe the same revision.

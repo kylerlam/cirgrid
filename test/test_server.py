@@ -4,21 +4,25 @@ from http.client import HTTPConnection
 from contextlib import closing
 from concurrent.futures import ThreadPoolExecutor
 import json
+from copy import deepcopy
+from datetime import date
 from pathlib import Path
 import sqlite3
 from tempfile import TemporaryDirectory
 from threading import Thread
 import unittest
 
+from cirgrid_data import migrate_state
 from server import Store, make_server, password_hash
 
 
 STATE = {
-    "version": 2,
+    "version": 3,
     "habits": [{
         "id": "reading", "name": "Read 📘", "color": "#123456",
         "weeklyGoals": {"0001-01-01": 5, "2026-11-02": 3},
         "endDate": "2026-12-31", "stageGoal": "Read 3 → 5 books",
+        "startDate": "2026-11-01", "description": "Read 15 pages\nBefore breakfast",
     }],
     "completions": {"2026-11-01": {"reading": "late"}},
 }
@@ -159,7 +163,7 @@ class ServerTest(unittest.TestCase):
         cookie = self.login()
         status, _, backup = self.request("GET", "/api/export?format=json", cookie=cookie)
         self.assertEqual(status, 200)
-        empty_state = {"version": 2, "habits": [], "completions": {}}
+        empty_state = {"version": 3, "habits": [], "completions": {}}
         self.assertEqual(backup["state"], empty_state)
         status, _, empty_yaml = self.request("GET", "/api/export", cookie=cookie)
         self.assertEqual(status, 200)
@@ -191,6 +195,56 @@ class ServerTest(unittest.TestCase):
                   "completions": {"2026-11-01": {"reading": True}}}
         self.assertEqual(self.request("POST", "/api/import", {"format": "json", "text": json.dumps(legacy)},
                                       cookie=cookie)[2], {"state": legacy})
+        self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2], {"state": STATE, "revision": 1})
+
+    def test_migrates_saved_v2_once_and_preserves_checkins(self):
+        legacy = deepcopy(STATE)
+        legacy["version"] = 2
+        for habit in legacy["habits"]:
+            del habit["startDate"], habit["description"]
+        with closing(sqlite3.connect(self.directory / "cirgrid.sqlite3")) as db, db:
+            db.execute("INSERT INTO tracker VALUES (1, 7, ?)", (json.dumps(legacy),))
+        migrated = Store(self.directory).read_state()
+        self.assertEqual(migrated, {"state": migrate_state(legacy), "revision": 8})
+        self.assertEqual(migrated["state"]["completions"], STATE["completions"])
+        self.assertEqual(Store(self.directory).read_state(), migrated)
+        cookie = self.login()
+        self.assertEqual(self.request("POST", "/api/import", {"format": "json", "text": json.dumps(legacy)},
+                                      cookie=cookie)[2], {"state": legacy})
+        self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2], migrated)
+
+    def test_legacy_start_date_uses_checkins_or_today_with_end_date_cap(self):
+        legacy = {"version": 2, "habits": [], "completions": {
+            "2026-11-02": {"reading": True}, "2026-11-01": {"reading": "late"},
+        }}
+        for identifier, end_date in (("reading", ""), ("new", ""), ("ended", "2026-10-31")):
+            legacy["habits"].append({
+                "id": identifier, "name": identifier, "color": "blue", "weeklyGoals": {"0001-01-01": 5},
+                "endDate": end_date, "stageGoal": "",
+            })
+        migrated = migrate_state(legacy, "2026-11-06")
+        self.assertEqual([habit["startDate"] for habit in migrated["habits"]],
+                         ["2026-11-01", "2026-11-06", "2026-10-31"])
+        self.assertEqual(migrated["completions"], legacy["completions"])
+        self.assertEqual(legacy["version"], 2)
+        self.assertEqual(migrate_state(legacy)["habits"][1]["startDate"], date.today().isoformat())
+
+    def test_start_date_and_description_validation_preserves_saved_state(self):
+        cookie = self.login()
+        self.assertEqual(self.request("PUT", "/api/state", {"state": STATE, "revision": 0}, cookie=cookie)[0], 200)
+        for changes in (
+            {"startDate": ""}, {"startDate": "2026-02-30"}, {"startDate": "2027-01-01"},
+            {"description": "x" * 501}, {"description": "📘" * 251},
+            {"description": " outer spaces "}, {"description": "tab\there"},
+        ):
+            with self.subTest(changes=changes):
+                invalid = deepcopy(STATE)
+                invalid["habits"][0].update(changes)
+                self.assertEqual(self.request("PUT", "/api/state", {"state": invalid, "revision": 1},
+                                              cookie=cookie)[0], 400)
+        missing = deepcopy(STATE)
+        del missing["habits"][0]["startDate"]
+        self.assertEqual(self.request("PUT", "/api/state", {"state": missing, "revision": 1}, cookie=cookie)[0], 400)
         self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2], {"state": STATE, "revision": 1})
 
 
