@@ -8,6 +8,7 @@ function historyStatus(state, habit, date, today) {
   if (date > today) return ['is-future', 'Future date'];
   if (isLateCompletion(state, habit.id, date)) return ['is-complete is-makeup', 'Backfilled'];
   if (isCompleted(state, habit.id, date)) return ['is-complete', 'Completed'];
+  if (date < habit.startDate) return ['is-ended', 'Not started'];
   if (!isHabitActive(habit, date)) return ['is-ended', 'Stage ended'];
   return ['', 'Not checked in'];
 }

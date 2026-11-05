@@ -16,8 +16,9 @@ RESERVED_IDS = {
 JS_WHITESPACE = "\u0009\u000a\u000b\u000c\u000d\u0020\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 
-def tracker_text(value, maximum, minimum=0):
-    if not isinstance(value, str) or value.strip(JS_WHITESPACE) != value or re.search(r"[\x00-\x1f\x7f]", value):
+def tracker_text(value, maximum, minimum=0, *, multiline=False):
+    controls = r"[\x00-\x09\x0b-\x1f\x7f]" if multiline else r"[\x00-\x1f\x7f]"
+    if not isinstance(value, str) or value.strip(JS_WHITESPACE) != value or re.search(controls, value):
         return False
     try:
         return minimum <= len(value.encode("utf-16-le")) // 2 <= maximum
@@ -32,16 +33,18 @@ def tracker_date(value):
 
 
 def validate_state(state, allow_legacy=False):
-    """Accept v2 data or, for imports, the browser-only v1 shape."""
+    """Accept v3 data and, during migration, the previous v1/v2 shapes."""
     if not isinstance(state, dict) or state.keys() != {"version", "habits", "completions"}:
         raise ValueError("Invalid tracker data.")
     version, habits, completions = state["version"], state["habits"], state["completions"]
-    if (type(version) is not int or version not in ((1, 2) if allow_legacy else (2,))
+    if (type(version) is not int or version not in ((1, 2, 3) if allow_legacy else (3,))
             or not isinstance(habits, list) or not isinstance(completions, dict)):
         raise ValueError("Unsupported tracker data.")
     fields = {"id", "name", "color"}
-    if version == 2:
+    if version >= 2:
         fields |= {"weeklyGoals", "endDate", "stageGoal"}
+    if version == 3:
+        fields |= {"startDate", "description"}
     ids, names = set(), set()
     for habit in habits:
         if not isinstance(habit, dict) or habit.keys() != fields:
@@ -53,7 +56,7 @@ def validate_state(state, allow_legacy=False):
                 or not isinstance(color, str)
                 or (color not in HABIT_COLORS and (version == 1 or not re.fullmatch(r"#[0-9a-f]{6}", color)))):
             raise ValueError("Invalid habit.")
-        if version == 2:
+        if version >= 2:
             weekly_goals, end_date, stage_goal = habit["weeklyGoals"], habit["endDate"], habit["stageGoal"]
             if not isinstance(weekly_goals, dict) or "0001-01-01" not in weekly_goals:
                 raise ValueError("Missing weekly goal.")
@@ -64,6 +67,12 @@ def validate_state(state, allow_legacy=False):
             for day, goal in weekly_goals.items():
                 if tracker_date(day).weekday() != 0 or type(goal) is not int or not 1 <= goal <= 7:
                     raise ValueError("Invalid weekly goal.")
+        if version == 3:
+            tracker_date(habit["startDate"])
+            if end_date and habit["startDate"] > end_date:
+                raise ValueError("The end date must be on or after the start date.")
+            if not tracker_text(habit["description"], 500, multiline=True):
+                raise ValueError("Invalid habit description.")
         ids.add(identifier)
         names.add(name.lower())
     for day, records in completions.items():
@@ -73,6 +82,24 @@ def validate_state(state, allow_legacy=False):
         for identifier, status in records.items():
             if identifier not in ids or (status is not True and (version == 1 or status != "late")):
                 raise ValueError("Invalid check-in.")
+
+
+def migrate_state(state, today=None):
+    validate_state(state, allow_legacy=True)
+    if state["version"] == 3:
+        return state
+    today = date.today().isoformat() if today is None else today
+    tracker_date(today)
+    habits = []
+    for habit in state["habits"]:
+        values = habit if state["version"] == 2 else {
+            **habit, "weeklyGoals": {"0001-01-01": 5}, "endDate": "", "stageGoal": "",
+        }
+        start_date = min((day for day, records in state["completions"].items() if habit["id"] in records), default=today)
+        if values["endDate"]:
+            start_date = min(start_date, values["endDate"])
+        habits.append({**values, "startDate": start_date, "description": ""})
+    return {**state, "version": 3, "habits": habits}
 
 
 def unique_fields(pairs):

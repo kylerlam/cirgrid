@@ -232,7 +232,8 @@ function shiftWeek(offset) {
   catch (error) { elements.status.textContent = t(error.message); }
 }
 
-function mergeBackup(current, incoming, legacy) {
+function mergeBackup(current, incoming, version) {
+  const legacy = version === 1;
   const habits = current.habits.slice();
   let changed = false;
   const conflict = () => new Error('This backup conflicts with saved habits or check-ins. No records were changed.');
@@ -244,6 +245,7 @@ function mergeBackup(current, incoming, legacy) {
       changed = true;
     } else if (!legacy && (existing.name !== habit.name || existing.color !== habit.color
       || existing.endDate !== habit.endDate || existing.stageGoal !== habit.stageGoal
+      || (version >= 3 && (existing.startDate !== habit.startDate || existing.description !== habit.description))
       || Object.keys(existing.weeklyGoals).length !== Object.keys(habit.weeklyGoals).length
       || Object.entries(habit.weeklyGoals).some(([date, goal]) => existing.weeklyGoals[date] !== goal))) {
       throw conflict();
@@ -267,7 +269,7 @@ function mergeBackup(current, incoming, legacy) {
 function importState(raw) {
   const incoming = migrateState(raw);
   return serialize(() => write((current, currentRevision) => currentRevision === 0
-    ? incoming : mergeBackup(current, incoming, raw.version === 1)));
+    ? incoming : mergeBackup(current, incoming, raw.version)));
 }
 
 async function importFile(file) {

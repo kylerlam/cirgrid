@@ -28,6 +28,8 @@ const validColor = color => colorIds.has(color) || (typeof color === 'string' &&
 const validGoal = goal => Number.isInteger(goal) && goal >= 1 && goal <= 7;
 const validStageGoal = goal => typeof goal === 'string' && goal === goal.trim()
   && goal.length <= 120 && !/[\u0000-\u001f\u007f]/.test(goal);
+const validDescription = value => typeof value === 'string' && value === value.trim()
+  && value.length <= 500 && !/[\u0000-\u0009\u000b-\u001f\u007f]/.test(value);
 
 export function localDateKey(date = new Date()) {
   if (!(date instanceof Date) || !Number.isFinite(date.getTime())
@@ -90,14 +92,14 @@ export function formatWeekRange(dateKey, locale = 'en-US') {
 
 export function createInitialState() {
   return {
-    version: 2,
+    version: 3,
     habits: [],
     completions: {},
   };
 }
 
 export function validateState(value) {
-  return validateVersion(value, 2);
+  return validateVersion(value, 3);
 }
 
 function validateVersion(value, version) {
@@ -105,6 +107,7 @@ function validateVersion(value, version) {
     || !Array.isArray(value.habits) || !isObject(value.completions)) return false;
   const legacy = version === 1;
   const habitKeys = legacy ? ['id', 'name', 'color'] : ['id', 'name', 'color', 'weeklyGoals', 'endDate', 'stageGoal'];
+  if (version === 3) habitKeys.push('startDate', 'description');
   const ids = new Set();
   const names = new Set();
   for (const habit of value.habits) {
@@ -117,6 +120,10 @@ function validateVersion(value, version) {
         || !validStageGoal(stageGoal) || (stageGoal && !endDate)) return false;
       try {
         if (endDate !== '') parseDateKey(endDate);
+        if (version === 3) {
+          parseDateKey(habit.startDate);
+          if (!validDescription(habit.description) || (endDate && endDate < habit.startDate)) return false;
+        }
         if (Object.entries(weeklyGoals).some(([week, goal]) => !validGoal(goal)
           || parseDateKey(week).getDay() !== 1)) return false;
       } catch { return false; }
@@ -133,15 +140,26 @@ function validateVersion(value, version) {
   return true;
 }
 
-export function migrateState(state) {
+export function migrateState(state, today = localDateKey()) {
   if (validateState(state)) return state;
-  if (!validateVersion(state, 1)) {
+  if (!validateVersion(state, 1) && !validateVersion(state, 2)) {
     throw new Error('Saved habit data is invalid or uses an unsupported version. Your existing data has not been changed.');
   }
+  parseDateKey(today);
+  const completionDates = Object.keys(state.completions).sort();
   return {
     ...state,
-    version: 2,
-    habits: state.habits.map(habit => ({ ...habit, weeklyGoals: { [firstWeek]: defaultGoal }, endDate: '', stageGoal: '' })),
+    version: 3,
+    habits: state.habits.map(habit => {
+      const firstCompletion = completionDates.find(date => Object.hasOwn(state.completions[date], habit.id));
+      const startDate = firstCompletion ?? today;
+      return {
+        ...habit,
+        ...(state.version === 1 ? { weeklyGoals: { [firstWeek]: defaultGoal }, endDate: '', stageGoal: '' } : {}),
+        startDate: habit.endDate && habit.endDate < startDate ? habit.endDate : startDate,
+        description: '',
+      };
+    }),
   };
 }
 
@@ -162,10 +180,16 @@ function normalizeHabit(state, values, previous) {
   }
   const endDate = values.endDate === undefined ? previous?.endDate ?? '' : values.endDate;
   if (endDate !== '') parseDateKey(endDate);
+  const startDate = values.startDate === undefined ? previous?.startDate : values.startDate;
+  parseDateKey(startDate);
+  if (endDate && endDate < startDate) throw new RangeError('End date must be on or after start date.');
+  let description = values.description === undefined ? previous?.description ?? '' : values.description;
+  if (typeof description === 'string') description = description.replace(/\r\n?/g, '\n').trim();
+  if (!validDescription(description)) throw new TypeError('Use a description up to 500 characters.');
   let stageGoal = values.stageGoal === undefined ? previous?.stageGoal ?? '' : values.stageGoal;
   if (typeof stageGoal === 'string') stageGoal = stageGoal.trim();
   if (!validStageGoal(stageGoal)) throw new TypeError('Use a stage goal up to 120 characters.');
-  return { name, color, endDate, stageGoal: endDate ? stageGoal : '' };
+  return { name, color, startDate, description, endDate, stageGoal: endDate ? stageGoal : '' };
 }
 
 export function habitColor(habit) {
@@ -174,7 +198,7 @@ export function habitColor(habit) {
 }
 
 export function isHabitActive(habit, dateKey) {
-  return habit.endDate === '' || dateKey <= habit.endDate;
+  return dateKey >= habit.startDate && (habit.endDate === '' || dateKey <= habit.endDate);
 }
 
 export function weeklyGoal(habit, dateKey) {
@@ -184,9 +208,10 @@ export function weeklyGoal(habit, dateKey) {
 }
 
 export function weeklyProgress(state, habit, dates, today) {
-  const completed = dates.filter(date => isCompleted(state, habit.id, date)).length;
+  const activeDates = dates.filter(date => isHabitActive(habit, date));
+  const completed = activeDates.filter(date => isCompleted(state, habit.id, date)).length;
   const goal = weeklyGoal(habit, dates[0]);
-  const status = completed >= goal ? 'met' : dates.at(-1) < today ? 'missed' : 'pending';
+  const status = !activeDates.length ? 'inactive' : completed >= goal ? 'met' : dates.at(-1) < today ? 'missed' : 'pending';
   return { completed, goal, status };
 }
 
@@ -205,7 +230,9 @@ export function toggleCompletion(state, habitId, dateKey, today = localDateKey()
   const records = { ...state.completions[dateKey] };
   if (Object.hasOwn(records, habitId)) delete records[habitId];
   else {
-    if (!isHabitActive(habit, dateKey)) throw new RangeError('This habit has ended.');
+    if (!isHabitActive(habit, dateKey)) {
+      throw new RangeError(dateKey < habit.startDate ? 'This habit has not started yet.' : 'This habit has ended.');
+    }
     records[habitId] = week < currentWeek ? 'late' : true;
   }
   const completions = { ...state.completions };
