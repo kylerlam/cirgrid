@@ -1,6 +1,20 @@
 import { request } from './api.js';
 import { languages, themes, getLanguage, getTheme, localize, setLanguage, setTheme, t } from './preferences.js';
 
+export function dismissOnBackdrop(dialog, close = () => dialog.close()) {
+  let backdropPress = false;
+  function isBackdrop(event) {
+    const bounds = dialog.getBoundingClientRect();
+    return event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right
+      || event.clientY < bounds.top || event.clientY > bounds.bottom);
+  }
+  dialog.addEventListener('pointerdown', event => { backdropPress = isBackdrop(event); });
+  dialog.addEventListener('click', event => {
+    if (backdropPress && isBackdrop(event)) close();
+    backdropPress = false;
+  });
+}
+
 export function addPasswordToggle(input) {
   const entry = document.createElement('div');
   entry.className = 'password-entry';
@@ -64,17 +78,7 @@ export function createSettings({ username, onImport, onDownload, onSignOut } = {
       </section>` : ''}
   `;
   document.body.append(dialog);
-  let backdropPress = false;
-  function isBackdrop(event) {
-    const bounds = dialog.getBoundingClientRect();
-    return event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right
-      || event.clientY < bounds.top || event.clientY > bounds.bottom);
-  }
-  dialog.addEventListener('pointerdown', event => { backdropPress = isBackdrop(event); });
-  dialog.addEventListener('click', event => {
-    if (backdropPress && isBackdrop(event)) dialog.close();
-    backdropPress = false;
-  });
+  dismissOnBackdrop(dialog);
   for (const input of dialog.querySelectorAll('input[type="password"]')) addPasswordToggle(input);
 
   const language = dialog.querySelector('select[name="language"]');

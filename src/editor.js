@@ -1,5 +1,6 @@
 import { HABIT_COLORS, addHabit, updateHabit, deleteHabit, habitColor, localDateKey, weeklyGoal } from './model.js';
 import { t } from './preferences.js';
+import { dismissOnBackdrop } from './settings.js';
 
 export function createHabitEditor({ getState, onChange }) {
   const dialog = document.createElement('dialog');
@@ -156,6 +157,7 @@ export function createHabitEditor({ getState, onChange }) {
   function close() {
     if (!saving && dialog.open) dialog.close();
   }
+  dismissOnBackdrop(dialog, close);
 
   function setSaving(value) {
     saving = value;
