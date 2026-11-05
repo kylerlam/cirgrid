@@ -5,7 +5,7 @@ import {
   HABIT_COLORS, localDateKey, parseDateKey, shiftDate, weekDates,
   formatWeekRange, createInitialState, validateState, isCompleted, isLateCompletion,
   toggleCompletion, addHabit, updateHabit, deleteHabit,
-  habitColor, isHabitActive, migrateState, weeklyGoal, weeklyProgress,
+  habitColor, isHabitActive, migrateState, weeklyGoal, weeklyProgress, moveHabit,
 } from '../src/model.js';
 
 function frozen(value) {
@@ -144,6 +144,21 @@ test('deleting a habit removes all its history and preserves unrelated records',
   assert.equal(isCompleted(state, 'reading', '2026-10-20'), true);
   assert.equal(validateState(result), true);
   assert.throws(() => deleteHabit(state, 'unknown'), /no longer exists/);
+});
+
+test('reordering moves a habit by identity without changing its records or settings', () => {
+  const state = frozen(toggleCompletion(sampleState(), 'reading', '2026-11-03', '2026-11-03'));
+  const first = moveHabit(state, 'reading', 'sunscreen');
+  assert.deepEqual(first.habits.map(habit => habit.id), ['reading', 'sunscreen', 'exercise']);
+  const last = moveHabit(first, 'reading', null);
+  assert.deepEqual(last.habits, state.habits);
+  assert.equal(first.habits[0], state.habits[2]);
+  assert.equal(first.completions, state.completions);
+  assert.equal(validateState(first), true);
+  assert.equal(moveHabit(state, 'reading', null), state);
+  assert.equal(moveHabit(state, 'exercise', 'exercise'), state);
+  assert.throws(() => moveHabit(state, 'missing', null), /no longer exists/);
+  assert.throws(() => moveHabit(state, 'reading', 'missing'), /no longer exists/);
 });
 
 test('schema validation rejects unsupported versions, duplicate identities, malformed dates, and orphan records', () => {

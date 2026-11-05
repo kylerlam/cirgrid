@@ -3,6 +3,8 @@
 CirGrid is a private, open-source habit tracker with synchronized circular and grid views. It is a sister app to [Daily Todo](https://github.com/kylerlam/daily-todo), with its own account and database.
 
 - Check in through either tracker and browse Monday-to-Sunday weeks.
+- Hold a sidebar habit for 0.3 seconds to unlock sorting. You can drag immediately or release first; the highlighted row stays unlocked for the next drag. Release after moving to save, or press Escape to cancel. Keyboard users can focus a habit and press Alt+Up or Alt+Down. The saved order is shared by both trackers and devices.
+- Use the grid on the left and the circular tracker on the right. Today's full grid column and circular sector have an accent outline and shadow, so the current day stands out even when another date is selected.
 - Set a weekly target of 1–7 days for each habit. The default is 5. Changes apply to the current week and later weeks.
 - See each week's score and outcome. Make up missed check-ins in past weeks. The gold outline identifies a check-in added after its week ended.
 - Open the separate Habit history page to browse a habit by month or year. Calendar months show every real date, including leap days. Select dates to read their details on the same page. Use **Open weekly tracker** when you want to review or make up check-ins in that week.

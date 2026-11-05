@@ -148,6 +148,40 @@ export function renderCircle(container, { state, dates, selectedDate, today, onT
         }
       });
     });
+    const todayIndex = dates.indexOf(today);
+    if (todayIndex !== -1) {
+      const outer = radius + 1;
+      const inner = innerRadius - 1;
+      const start = todayIndex * sectorAngle;
+      const end = (todayIndex + 1) * sectorAngle;
+      const corner = 8;
+      const a = point(outer, start + corner / outer), b = point(outer, end - corner / outer);
+      const c = point(outer - corner, end), d = point(inner + corner, end);
+      const e = point(inner, end - corner / inner), f = point(inner, start + corner / inner);
+      const g = point(inner + corner, start), h = point(outer - corner, start);
+      const shape = `M ${a} A ${outer} ${outer} 0 0 1 ${b} Q ${point(outer, end)} ${c} L ${d} Q ${point(inner, end)} ${e} A ${inner} ${inner} 0 0 0 ${f} Q ${point(inner, start)} ${g} L ${h} Q ${point(outer, start)} ${a} Z`;
+      const shadow = svgElement('filter', {
+        id: 'today-sector-shadow', filterUnits: 'userSpaceOnUse', x: 0, y: 0, width: size, height: size,
+        'color-interpolation-filters': 'sRGB',
+      });
+      shadow.append(
+        svgElement('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: 2.5, result: 'blur' }),
+        svgElement('feOffset', { in: 'blur', dx: 2, result: 'offset' }),
+        svgElement('feComposite', { in: 'offset', in2: 'SourceAlpha', operator: 'out', result: 'outside' }),
+        svgElement('feFlood', { 'flood-color': 'var(--today-shadow-color)', result: 'color' }),
+        svgElement('feComposite', { in: 'color', in2: 'outside', operator: 'in' }),
+      );
+      const definitions = svgElement('defs');
+      definitions.append(shadow);
+      svg.append(definitions, svgElement('path', {
+        d: shape, fill: '#000', filter: 'url(#today-sector-shadow)',
+        'aria-hidden': 'true', 'pointer-events': 'none',
+      }));
+      svg.append(svgElement('path', {
+        class: 'circle-today-outline', 'aria-hidden': 'true',
+        d: shape,
+      }));
+    }
     svg.append(outline);
 
     dates.forEach((dateKey, index) => {
@@ -207,8 +241,9 @@ export function renderGrid(container, { state, dates, selectedDate, today, onTog
   headingRow.append(habitHeading);
   dates.forEach(dateKey => {
     const date = parseDateKey(dateKey);
-    const heading = element('th', `grid-date-header${dateKey === today ? ' is-today' : ''}${dateKey === selectedDate ? ' is-selected' : ''}`);
+    const heading = element('th', `grid-date-header${dateKey === today ? ' is-today grid-today' : ''}${dateKey === selectedDate ? ' is-selected' : ''}`);
     heading.scope = 'col';
+    if (dateKey === today) heading.setAttribute('aria-current', 'date');
     heading.append(element('span', 'grid-weekday', formatWeekday.format(date)), element('span', 'grid-day', date.getDate()));
     headingRow.append(heading);
   });
@@ -241,7 +276,7 @@ export function renderGrid(container, { state, dates, selectedDate, today, onTog
       const late = isLateCompletion(state, habit.id, dateKey);
       const canToggle = completed || isHabitActive(habit, dateKey);
       const canMakeUp = pastWeek && canToggle && !completed;
-      const cell = element('td');
+      const cell = element('td', dateKey === today ? 'grid-today' : '');
       const button = element('button', `check-cell${completed ? ' is-complete' : ''}${late ? ' is-makeup' : ''}`);
       button.type = 'button';
       button.disabled = !canToggle;

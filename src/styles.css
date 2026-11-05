@@ -4,6 +4,8 @@
   --muted-text: var(--muted, #6d7783);
   --pending-cell: var(--surface-soft, #eff1f3);
   --makeup-ring: #d69e13;
+  --today-border: color-mix(in srgb, var(--accent) 50%, transparent);
+  --today-shadow-color: color-mix(in srgb, var(--accent) 20%, transparent);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-size: 16px;
   line-height: 1.5;
@@ -40,6 +42,11 @@ h1, h2, p { margin: 0; }
 .habit-item:hover { background: var(--surface-soft); }
 .habit-item .habit-name { flex: 1; }
 .habit-item .icon { width: 15px; height: 15px; color: var(--muted-text); }
+.habit-item, .habit-item * { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
+.habit-item.is-reorder-ready { cursor: grab; outline: 2px solid var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.habit-list.is-reordering .habit-item { cursor: grabbing; }
+.habit-item.is-dragging { opacity: .4; outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-soft); }
+.habit-drag-preview { position: fixed; z-index: 20; margin: 0; pointer-events: none; background: var(--surface); outline: 2px solid var(--accent); box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 30%, transparent); }
 .habit-dot { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%; }
 .habit-name { overflow-wrap: anywhere; }
 .sidebar-empty { color: var(--muted-text); padding-inline: 8px; }
@@ -80,6 +87,7 @@ h1, h2, p { margin: 0; }
 .circle-cell:focus { outline: none; }
 .circle-cell[aria-disabled="true"] { cursor: default; opacity: .45; }
 .circle-outline { fill: none; stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+.circle-today-outline { fill: none; stroke: var(--today-border); stroke-width: 1.5; stroke-linejoin: round; pointer-events: none; }
 .circle-cell.is-makeup, .circle-outline.is-makeup { stroke: var(--makeup-ring); stroke-width: 2; }
 .circle-check { color: var(--text); }
 .circle-date-label { font-family: inherit; }
@@ -105,6 +113,9 @@ h1, h2, p { margin: 0; }
 .grid-weekday { font-weight: 550; }
 .grid-day { margin-top: 3px; color: var(--muted-text); }
 .grid-date-header.is-today .grid-day, .grid-date-header.is-selected .grid-day { color: var(--accent); font-weight: 650; }
+.habit-grid .grid-today { background: transparent; box-shadow: inset 1px 0 var(--today-border), inset -1px 0 var(--today-border), 2px 0 5px var(--today-shadow-color); }
+.habit-grid .grid-date-header.grid-today { border-top: 1px solid var(--today-border); border-radius: 7px 7px 0 0; }
+.habit-grid tbody tr:last-child td.grid-today { border-bottom: 1px solid var(--today-border); border-radius: 0 0 7px 7px; }
 .habit-row-name { display: flex; align-items: center; gap: 7px; font-size: 14px; }
 .check-cell, .key-cell { width: min(36px, 100%); height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-soft); color: var(--text); vertical-align: middle; }
 .check-cell:hover:not(.is-complete, :disabled) { border-color: var(--accent); background: var(--accent-soft); }
