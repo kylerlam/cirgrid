@@ -7,7 +7,7 @@ const output = join(root, 'dist');
 const sources = [
   'index.html', '_headers', 'assets/icon.svg',
   ...['app.js', 'model.js', 'views.js', 'history.js', 'history-period.js', 'editor.js',
-    'settings.js', 'preferences.js', 'translations.js', 'demo-store.js', 'demo-samples.js',
+    'settings.js', 'preferences.js', 'translations.js', 'reorder.js', 'demo-store.js', 'demo-samples.js',
     'styles.css', 'themes.css', 'account.css'].map(name => 'src/' + name),
 ];
 

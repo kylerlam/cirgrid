@@ -1,6 +1,6 @@
 # CirGrid — Browser Demo
 
-This `codex/demo` branch demonstrates CirGrid 1.0.0 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
+This `codex/demo` branch demonstrates CirGrid 1.1.0 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
 
 The production `main` branch starts empty and keeps its account and SQLite storage separate.
 
@@ -18,6 +18,8 @@ Open **http://127.0.0.1:4174**. Python only serves the static `dist/` directory;
 ## Features to explore
 
 - Check in through synchronized circular and grid views.
+- Hold a sidebar habit for 0.3 seconds to unlock sorting. Drag immediately or release first; the highlighted row stays unlocked for the next drag. Release after moving to save, press Escape to cancel, or use Alt+Up/Down. Both trackers share the saved browser-local order.
+- Use the grid on the left and circle on the right, with today outlined across the full grid column and circular sector.
 - Compare different weekly targets and past weekly outcomes.
 - Make up a missed day in a past week and see its gold outline.
 - Review active and expired staged habits with end dates and optional goals.

@@ -251,3 +251,12 @@ export function deleteHabit(state, habitId) {
   }
   return { ...state, habits: state.habits.filter(habit => habit.id !== habitId), completions };
 }
+
+export function moveHabit(state, habitId, beforeId) {
+  const habit = requireHabit(state, habitId);
+  if (beforeId === habitId) return state;
+  if (beforeId !== null) requireHabit(state, beforeId);
+  const habits = state.habits.filter(item => item.id !== habitId);
+  habits.splice(beforeId === null ? habits.length : habits.findIndex(item => item.id === beforeId), 0, habit);
+  return habits.every((item, index) => item === state.habits[index]) ? state : { ...state, habits };
+}

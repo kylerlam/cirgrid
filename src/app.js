@@ -1,6 +1,6 @@
 import {
   createInitialState, habitColor, isCompleted,
-  weekDates, shiftDate, formatWeekRange, toggleCompletion,
+  weekDates, shiftDate, formatWeekRange, toggleCompletion, moveHabit,
 } from './model.js';
 import { renderCircle, renderGrid } from './views.js';
 import { renderHistory } from './history.js';
@@ -9,6 +9,7 @@ import { createHabitEditor } from './editor.js';
 import { createDemoStore, demoToday, DEMO_STORAGE_KEY } from './demo-store.js';
 import { applyPreferences, getLanguage, t } from './preferences.js';
 import { createSettings } from './settings.js';
+import { createHabitReorder } from './reorder.js';
 
 const elements = Object.fromEntries(['habit-list', 'new-habit', 'week-range', 'previous-week', 'next-week',
   'selected-date', 'today', 'circle-tracker', 'grid-tracker', 'storage-error', 'status', 'reset-demo',
@@ -74,6 +75,14 @@ async function applyChange(transform, message) {
 }
 
 const editor = createHabitEditor({ getState: () => state, getToday: demoToday, onChange: applyChange });
+const habitOrder = createHabitReorder(elements['habit-list'], {
+  onDrop: async (habitId, beforeId) => {
+    if (!await applyChange(current => moveHabit(current, habitId, beforeId), 'Habit order saved.')) render();
+    document.querySelector('[data-edit-habit="' + habitId + '"]')?.focus({ preventScroll: true });
+  },
+  onCancel: () => { render(); elements.status.textContent = ''; },
+  onUnlock: () => { elements.status.textContent = t('Drag to reorder. Release to save; Escape to cancel.'); },
+});
 
 function toggle(habitId, dateKey) {
   const completed = !isCompleted(state, habitId, dateKey);
@@ -101,6 +110,8 @@ function renderHabits() {
     button.className = 'habit-item';
     button.dataset.editHabit = habit.id;
     button.setAttribute('aria-label', t('Edit {0}', habit.name));
+    button.title = t('Hold for 0.3 seconds to drag. Alt+Up or Alt+Down also reorders.');
+    button.setAttribute('aria-keyshortcuts', 'Alt+ArrowUp Alt+ArrowDown');
     const dot = document.createElement('span');
     dot.className = 'habit-dot';
     dot.style.backgroundColor = habitColor(habit).value;
@@ -143,6 +154,7 @@ function showPage(focus = false) {
 }
 
 function render() {
+  habitOrder.cancel();
   const active = document.activeElement;
   const focus = active?.dataset?.view ? { view: active.dataset.view, habitId: active.dataset.habitId, date: active.dataset.date } : null;
   const editHabit = active?.dataset?.editHabit;

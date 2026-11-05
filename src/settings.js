@@ -16,6 +16,17 @@ export function createSettings() {
     </div>
   `;
   document.body.append(dialog);
+  let backdropPress = false;
+  function isBackdrop(event) {
+    const bounds = dialog.getBoundingClientRect();
+    return event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right
+      || event.clientY < bounds.top || event.clientY > bounds.bottom);
+  }
+  dialog.addEventListener('pointerdown', event => { backdropPress = isBackdrop(event); });
+  dialog.addEventListener('click', event => {
+    if (backdropPress && isBackdrop(event)) dialog.close();
+    backdropPress = false;
+  });
 
   const language = dialog.querySelector('select[name="language"]');
   for (const [id, label] of Object.entries(languages)) language.add(new Option(label, id));
