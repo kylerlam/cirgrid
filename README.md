@@ -6,11 +6,14 @@ CirGrid is a private, open-source habit tracker with synchronized circular and g
 - Hold a sidebar habit for 0.3 seconds to unlock sorting. You can drag immediately or release first; the highlighted row stays unlocked for the next drag. Release after moving to save, or press Escape to cancel. Keyboard users can focus a habit and press Alt+Up or Alt+Down. The saved order is shared by both trackers and devices.
 - Use the grid on the left and the circular tracker on the right. Today's full grid column and circular sector have an accent outline and shadow, so the current day stands out even when another date is selected.
 - Set a weekly target of 1–7 days for each habit. The default is 5. Changes apply to the current week and later weeks.
+- Keep habit names short and add optional descriptions for details in **New habit** or **Edit habit**. Descriptions are included in backups.
+- Set a required start date, defaulting to today. Dates before it are unavailable for check-ins and do not count as missed days or weeks.
 - See each week's score and outcome. Make up missed check-ins in past weeks. The gold outline identifies a check-in added after its week ended.
 - Open the separate Habit history page to browse a habit by month or year. Calendar months show every real date, including leap days. Select dates to read their details on the same page. Use **Open weekly tracker** when you want to review or make up check-ins in that week.
 - Leave the end date blank for an ongoing habit. Set an end date to make it a stage, with optional goal text such as “55 kg → 53 kg”. The end date is the last eligible day. The stage disappears from the current tracker the following day, and its past weeks remain available for review and makeup check-ins.
 - Pick a preset or custom habit color. Choose from ten Daily Todo themes and switch among English, Spanish, Simplified Chinese, and Traditional Chinese. Theme and language are saved per browser.
 - Sign in on desktop or mobile to use the same saved habits and check-ins.
+- Dismiss habit and Settings dialogs by clicking outside them, or use their close buttons or Escape.
 
 ## Run locally
 
@@ -40,9 +43,11 @@ Open the new CirGrid at the same hostname, port, and protocol as the previous ve
 
 ## Data and backups
 
-Use **Settings → Data** to download YAML or JSON, or import a CirGrid backup. Exports contain habits, weekly targets, and check-ins. They exclude credentials and sessions. Export also refreshes the server-side `cirgrid.yml` snapshot. The primary database is `data/cirgrid.sqlite3` for a local run, or `/app/data/cirgrid.sqlite3` in Docker.
+Use **Settings → Data** to download YAML or JSON, or import a CirGrid backup. Exports contain habits, descriptions, start dates, weekly targets, and check-ins. They exclude credentials and sessions. Export also refreshes the server-side `cirgrid.yml` snapshot. The primary database is `data/cirgrid.sqlite3` for a local run, or `/app/data/cirgrid.sqlite3` in Docker.
 
 Import adds missing records and rejects conflicting backups as a batch. Importing legacy browser data preserves the current settings and existing check-ins for habits with matching IDs. Make a fresh export before moving or restoring data.
+
+Version 1.2.0 upgrades older tracker data to include descriptions and start dates. Existing habits receive an empty description and a start date based on their earliest check-in, or today when no check-in exists, capped at the habit's end date. Existing check-ins remain intact. You can adjust the inferred start date in **Edit habit**.
 
 ## Development
 
