@@ -247,7 +247,10 @@ textarea.habit-input { resize: vertical; }
   .tracker-panel { padding: 16px 12px; }
   .panel-heading { padding-inline: 4px; }
   .panel-heading h2 { font-size: 23px; }
-  .habit-grid { display: block; min-width: 0; border: 0; }
+  .habit-grid { display: block; position: relative; isolation: isolate; min-width: 0; border: 0; }
+  .habit-grid.has-today::before { content: ''; position: absolute; box-sizing: border-box; z-index: -1; inset-block: 0; inset-inline-start: calc(var(--today-column) * 100% / 7); width: calc(100% / 7); border: 1px solid var(--today-border); border-radius: 7px; box-shadow: 2px 0 5px var(--today-shadow-color); pointer-events: none; }
+  .habit-grid .grid-today { box-shadow: none; }
+  .habit-grid .grid-date-header.grid-today, .habit-grid tbody tr:last-child td.grid-today { border: 0; border-radius: 0; }
   .habit-grid thead, .habit-grid tbody { display: block; }
   .habit-grid tr { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); }
   .habit-grid th, .habit-grid td { width: auto; padding: 4px 1px; border: 0; }

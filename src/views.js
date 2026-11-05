@@ -234,6 +234,11 @@ export function renderGrid(container, { state, dates, selectedDate, today, onTog
   const pastWeek = dates.at(-1) < today;
   const scroll = element('div', 'grid-scroll');
   const table = element('table', 'habit-grid');
+  const todayIndex = dates.indexOf(today);
+  if (todayIndex !== -1) {
+    table.classList.add('has-today');
+    table.style.setProperty('--today-column', todayIndex);
+  }
   table.setAttribute('aria-label', t('Weekly habit grid'));
   const head = element('thead');
   const headingRow = element('tr');

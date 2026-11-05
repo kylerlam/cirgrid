@@ -1,6 +1,6 @@
 # CirGrid — Browser Demo
 
-This `codex/demo` branch demonstrates CirGrid 1.2.0 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
+This `codex/demo` branch demonstrates CirGrid 1.2.1 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
 
 The production `main` branch starts empty and keeps its account and SQLite storage separate.
 

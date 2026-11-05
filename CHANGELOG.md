@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 — 2026-11-06
+
+- Keep today's transparent grid-column outline continuous on mobile, including habit labels and wrapped stage details, without blocking check-ins.
+
 ## 1.2.0 — 2026-11-06
 
 - Add optional habit descriptions in the habit editor, preserved in JSON/YAML backups.
