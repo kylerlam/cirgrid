@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createInitialState, validateState, weekDates, weeklyProgress } from '../src/model.js';
+import { createInitialState, isHabitActive, validateState, weekDates, weeklyProgress } from '../src/model.js';
 import { createDemoStore, createDemoState, demoToday, DEMO_STORAGE_KEY } from '../src/demo-store.js';
 
 function memoryStorage(initial = null) {
@@ -21,7 +21,7 @@ test('fictional samples validate and show weekly, late, and staged history', () 
   const today = demoToday(clock());
   const state = createDemoState(today);
   assert.equal(validateState(state), true);
-  assert.deepEqual(createInitialState(), { version: 2, habits: [], completions: {} });
+  assert.deepEqual(createInitialState(), { version: 3, habits: [], completions: {} });
   assert.equal(state.habits.length, 5);
   assert.ok(state.habits.some(habit => habit.endDate > today && habit.stageGoal));
   assert.ok(state.habits.some(habit => habit.endDate && habit.endDate < today && habit.stageGoal));
@@ -30,6 +30,9 @@ test('fictional samples validate and show weekly, late, and staged history', () 
   assert.ok(dates.every(date => date <= today));
   assert.ok((new Date(today) - new Date(dates[0])) / 86400000 >= 60);
   assert.ok(Object.values(state.completions).some(records => Object.values(records).includes('late')));
+  for (const [date, records] of Object.entries(state.completions)) {
+    for (const id of Object.keys(records)) assert.ok(isHabitActive(state.habits.find(habit => habit.id === id), date));
+  }
   const statuses = new Set();
   for (const date of dates) {
     if (weekDates(date).at(-1) >= today) continue;
@@ -37,6 +40,28 @@ test('fictional samples validate and show weekly, late, and staged history', () 
   }
   assert.ok(statuses.has('met'));
   assert.ok(statuses.has('missed'));
+});
+
+test('a same-day version 2 demo migrates without losing edits or check-ins', async () => {
+  const state = createDemoState('2026-11-04');
+  state.version = 2;
+  for (const habit of state.habits) {
+    delete habit.startDate;
+    delete habit.description;
+  }
+  state.habits[0].name = 'A saved sample edit';
+  const storage = memoryStorage(JSON.stringify({ version: 1, day: '2026-11-04', revision: 8, state }));
+  const store = createDemoStore({ storage, clock });
+  const migrated = await store.read();
+  assert.equal(validateState(migrated.state), true);
+  assert.equal(migrated.revision, 8);
+  assert.equal(migrated.state.habits[0].name, 'A saved sample edit');
+  assert.deepEqual(migrated.state.completions, state.completions);
+  assert.equal(migrated.state.habits[0].description, '');
+  assert.equal(migrated.state.habits[0].startDate,
+    Object.keys(state.completions).sort().find(date => state.completions[date]['demo-reading']));
+  await store.save(migrated.state, migrated.revision);
+  assert.equal(JSON.parse(storage.value()).state.version, 3);
 });
 
 test('same-day edits persist across store instances using only the demo key', async () => {

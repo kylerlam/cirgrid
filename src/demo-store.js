@@ -1,4 +1,4 @@
-import { parseDateKey, validateState } from './model.js';
+import { migrateState, parseDateKey, validateState } from './model.js';
 import { createDemoState } from './demo-samples.js';
 
 export { createDemoState } from './demo-samples.js';
@@ -27,8 +27,9 @@ function decode(raw) {
   try { value = JSON.parse(raw); }
   catch { throw invalidData(); }
   if (!value || Object.keys(value).length !== 4 || value.version !== 1
-    || !validDay(value.day) || !Number.isSafeInteger(value.revision) || value.revision < 1
-    || !validateState(value.state)) throw invalidData();
+    || !validDay(value.day) || !Number.isSafeInteger(value.revision) || value.revision < 1) throw invalidData();
+  try { value.state = migrateState(value.state, value.day); }
+  catch { throw invalidData(); }
   return value;
 }
 

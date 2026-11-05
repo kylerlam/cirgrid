@@ -25,7 +25,8 @@ function cellAttributes(node, view, habit, dateKey, { completed, late, canMakeUp
   node.dataset.view = view;
   node.dataset.habitId = habit.id;
   node.dataset.date = dateKey;
-  const status = late ? 'Made up' : completed ? 'Completed' : canMakeUp ? 'Make up' : canToggle ? 'Not checked in' : 'Stage ended';
+  const status = late ? 'Made up' : completed ? 'Completed' : canMakeUp ? 'Make up' : canToggle ? 'Not checked in'
+    : dateKey < habit.startDate ? 'Not started' : 'Stage ended';
   node.setAttribute('aria-label', t('{0}, {1}: {2}', habit.name, formatDate.format(parseDateKey(dateKey)), t(status)));
   node.setAttribute('aria-pressed', String(completed));
 }
@@ -33,8 +34,8 @@ function cellAttributes(node, view, habit, dateKey, { completed, late, canMakeUp
 function habitsForWeek(state, dates, today) {
   const pastWeek = dates.at(-1) < today;
   return state.habits.filter(habit => {
-    if (!pastWeek && !isHabitActive(habit, today)) return false;
-    return isHabitActive(habit, dates[0]) || dates.some(date => isCompleted(state, habit.id, date));
+    if (!pastWeek && habit.endDate && today > habit.endDate) return false;
+    return dates.some(date => isHabitActive(habit, date) || isCompleted(state, habit.id, date));
   });
 }
 
@@ -293,11 +294,12 @@ export function renderGrid(container, { state, dates, selectedDate, today, onTog
     });
     const { completed, goal, status } = weeklyProgress(state, habit, dates, today);
     const progress = element('td', 'grid-progress');
-    const label = element('span', 'progress-score', `${completed}/${goal}`);
-    const statusText = status === 'met' ? t('Goal reached') : status === 'missed' ? t('Goal missed') : t('In progress');
+    const label = element('span', 'progress-score', status === 'inactive' ? '—' : `${completed}/${goal}`);
+    const statusText = status === 'inactive' ? t(dates.at(-1) < habit.startDate ? 'Not started' : 'Stage ended')
+      : status === 'met' ? t('Goal reached') : status === 'missed' ? t('Goal missed') : t('In progress');
     label.title = statusText;
     progress.append(label, element('span', 'sr-only', ` ${statusText}`));
-    if (status !== 'pending') {
+    if (status === 'met' || status === 'missed') {
       const face = element('span', 'progress-face', status === 'met' ? '😄' : '😭');
       face.setAttribute('aria-hidden', 'true');
       progress.append(face);

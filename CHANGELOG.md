@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — 2026-11-06
+
+- Add optional habit descriptions in the habit editor, preserved in JSON/YAML backups.
+- Require a start date for new and edited habits, defaulting to today for new habits, and reject end dates before the start date.
+- Disable dates before a habit starts in both trackers and history. Exclude those dates and weeks from missed outcomes.
+- Upgrade older data with empty descriptions and inferred start dates while retaining existing check-ins. Use the earliest check-in, or today when there is none, capped at the end date.
+- Close habit dialogs by clicking their backdrop, with the same behavior for Settings. Clicks and drags starting inside a dialog keep it open.
+
 ## 1.1.0 — 2026-11-05
 
 - Reorder sidebar habits after a 0.3-second hold, with a highlighted drag preview, Escape cancellation, and Alt+Up/Down keyboard controls. Save the order across devices and both trackers.

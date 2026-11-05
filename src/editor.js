@@ -1,5 +1,6 @@
 import { HABIT_COLORS, addHabit, updateHabit, deleteHabit, habitColor, localDateKey, weeklyGoal } from './model.js';
 import { t } from './preferences.js';
+import { dismissOnBackdrop } from './settings.js';
 
 export function createHabitEditor({ getState, onChange, getToday = localDateKey }) {
   const dialog = document.createElement('dialog');
@@ -15,10 +16,18 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
     <form class="habit-form">
       <label class="field-label" for="habit-name" data-label="Habit name"></label>
       <input class="habit-input" id="habit-name" name="name" type="text" required maxlength="60" autocomplete="off" autofocus>
+      <div class="habit-field">
+        <label class="field-label" for="habit-description" data-label="Description (optional)"></label>
+        <textarea class="habit-input" id="habit-description" name="description" rows="2" maxlength="500"></textarea>
+      </div>
       <div class="habit-schedule">
         <div class="habit-field">
           <label class="field-label" for="habit-weekly-goal" data-label="Days per week"></label>
           <select class="habit-input" id="habit-weekly-goal" name="weeklyGoal" required></select>
+        </div>
+        <div class="habit-field">
+          <label class="field-label" for="habit-start-date" data-label="Start date"></label>
+          <input class="habit-input" id="habit-start-date" name="startDate" type="date" required min="0001-01-01" max="9999-12-31">
         </div>
         <div class="habit-field">
           <label class="field-label" for="habit-end-date" data-label="End date (optional)"></label>
@@ -52,7 +61,9 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
     </form>`;
   const heading = dialog.querySelector('h2');
   const input = dialog.querySelector('input[name="name"]');
+  const description = dialog.querySelector('textarea[name="description"]');
   const goal = dialog.querySelector('select[name="weeklyGoal"]');
+  const startDate = dialog.querySelector('input[name="startDate"]');
   const endDate = dialog.querySelector('input[name="endDate"]');
   const stageGoal = dialog.querySelector('input[name="stageGoal"]');
   const colors = dialog.querySelector('.color-options');
@@ -99,6 +110,11 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
     stageGoal.parentElement.hidden = !endDate.value;
   }
 
+  function updateDateBounds() {
+    endDate.min = startDate.value || '0001-01-01';
+    startDate.max = endDate.value || '9999-12-31';
+  }
+
   function syncHexColor() {
     hexColor.value = customColor.value.toUpperCase();
     hexColor.setCustomValidity('');
@@ -116,6 +132,8 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
   }
 
   endDate.addEventListener('input', updateStageField);
+  endDate.addEventListener('input', updateDateBounds);
+  startDate.addEventListener('input', updateDateBounds);
   customOption.addEventListener('click', () => {
     if (!colorPanel.hidden) return closeColorPanel();
     syncHexColor();
@@ -156,11 +174,12 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
   function close() {
     if (!saving && dialog.open) dialog.close();
   }
+  dismissOnBackdrop(dialog, close);
 
   function setSaving(value) {
     saving = value;
     dialog.setAttribute('aria-busy', String(value));
-    for (const control of dialog.querySelectorAll('button, input, select')) control.disabled = value;
+    for (const control of dialog.querySelectorAll('button, input, select, textarea')) control.disabled = value;
   }
 
   async function applyChange(transform, successMessage) {
@@ -191,8 +210,10 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
     const habitId = editingId;
     const values = {
       name: input.value,
+      description: description.value,
       color: presetColors.find(radio => radio.checked)?.value ?? customColor.value,
       weeklyGoal: Number(goal.value),
+      startDate: startDate.value,
       endDate: endDate.value,
       stageGoal: endDate.value ? stageGoal.value : '',
     };
@@ -248,8 +269,11 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
       remove.hidden = habit === null;
       input.value = habit?.name ?? '';
       input.placeholder = t('e.g. Morning walk');
+      description.value = habit?.description ?? '';
       goal.value = habit ? weeklyGoal(habit, getToday()) : 5;
+      startDate.value = habit?.startDate ?? getToday();
       endDate.value = habit?.endDate ?? '';
+      updateDateBounds();
       stageGoal.value = habit?.stageGoal ?? '';
       updateStageField();
       error.textContent = '';

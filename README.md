@@ -1,6 +1,6 @@
 # CirGrid — Browser Demo
 
-This `codex/demo` branch demonstrates CirGrid 1.1.0 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
+This `codex/demo` branch demonstrates CirGrid 1.2.0 with fictional habits and check-ins. It has no sign-in, accounts, database, or network API access. Each browser keeps its own changes until the next Hong Kong calendar day. **Reset sample data** restores the examples manually.
 
 The production `main` branch starts empty and keeps its account and SQLite storage separate.
 
@@ -21,6 +21,7 @@ Open **http://127.0.0.1:4174**. Python only serves the static `dist/` directory;
 - Hold a sidebar habit for 0.3 seconds to unlock sorting. Drag immediately or release first; the highlighted row stays unlocked for the next drag. Release after moving to save, press Escape to cancel, or use Alt+Up/Down. Both trackers share the saved browser-local order.
 - Use the grid on the left and circle on the right, with today outlined across the full grid column and circular sector.
 - Compare different weekly targets and past weekly outcomes.
+- Keep habit names short with optional descriptions, and choose a required start date. Earlier dates are unavailable for check-ins and do not count as missed weeks.
 - Make up a missed day in a past week and see its gold outline.
 - Review active and expired staged habits with end dates and optional goals.
 - Browse month and year history and read selected dates without leaving the calendar.
@@ -31,6 +32,8 @@ Open **http://127.0.0.1:4174**. Python only serves the static `dist/` directory;
 Only the `cirgrid.demo.state.v1` localStorage key contains demo records. The demo does not read production tracker data, cookies, credentials, or backups. Browser profiles and site origins are independent; two tabs on the same origin share demo changes.
 
 Changes persist during the same Hong Kong calendar day. The app checks for a new day on focus, visibility return, and every 60 seconds. A new day restores fictional samples. Browser storage can be cleared or unavailable and is not a private account or a backup.
+
+Saved samples from the previous demo migrate to the current format without losing same-day edits or check-ins. The next save writes the upgraded format; the next daily reset restores the current fictional samples.
 
 ## Publication
 
