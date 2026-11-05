@@ -5,6 +5,7 @@
 - Reorder sidebar habits after a 0.3-second hold, with a highlighted drag preview, Escape cancellation, and Alt+Up/Down keyboard controls. Save the order across devices and both trackers.
 - Place the grid tracker before the circular tracker.
 - Highlight today's full grid column and circular sector with a theme-colored outline and shadow.
+- Close Settings by clicking its backdrop; clicks inside the form keep it open.
 - Keep sorting unlocked after a long press is released, and prevent native text selection or dragging from interrupting sorting.
 
 ## 1.0.0 — 2026-11-04
