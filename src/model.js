@@ -76,6 +76,10 @@ export function formatWeekRange(dateKey, locale = 'en-US') {
   const days = weekDates(dateKey);
   const start = parseDateKey(days[0]);
   const end = parseDateKey(days[6]);
+  if (locale.startsWith('zh')) {
+    const numericDate = new Intl.DateTimeFormat(locale, { month: '2-digit', day: '2-digit', year: 'numeric' });
+    return `${numericDate.format(start)} – ${numericDate.format(end)}`;
+  }
   if (locale !== 'en-US' && locale !== 'en') {
     return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' })
       .formatRange(start, end);

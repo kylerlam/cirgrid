@@ -42,6 +42,9 @@ test('calendar helpers keep local dates and Monday-to-Sunday weeks across a year
   assert.equal(formatWeekRange('2026-11-03'), 'Nov 2 – 8, 2026');
   assert.equal(formatWeekRange('2026-12-01'), 'Nov 30 – Dec 6, 2026');
   assert.equal(formatWeekRange('2027-01-01'), 'Dec 28, 2026 – Jan 3, 2027');
+  assert.equal(formatWeekRange('2026-11-03', 'zh-CN'), '2026/11/02 – 2026/11/08');
+  assert.equal(formatWeekRange('2026-03-03', 'zh-TW'), '2026/03/02 – 2026/03/08');
+  assert.equal(formatWeekRange('2027-01-01', 'zh-CN'), '2026/12/28 – 2027/01/03');
 });
 
 test('date parsing rejects rolled-over, malformed, and out-of-range dates', () => {
