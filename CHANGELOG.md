@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.2 — 2026-11-06
+
+- Limit new and edited habit start dates to today or earlier, while allowing future end dates and preserving existing check-ins.
+- Pad Chinese week-range months and days, use tabular numerals, and keep week-navigation arrows in a fixed position at desktop and mobile widths.
+
 ## 1.2.1 — 2026-11-06
 
 - Keep today's transparent grid-column outline continuous on mobile, including habit labels and wrapped stage details, without blocking check-ins.
