@@ -27,7 +27,7 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
         </div>
         <div class="habit-field">
           <label class="field-label" for="habit-start-date" data-label="Start date"></label>
-          <input class="habit-input" id="habit-start-date" name="startDate" type="date" required min="0001-01-01" max="9999-12-31">
+          <input class="habit-input" id="habit-start-date" name="startDate" type="date" required min="0001-01-01">
         </div>
         <div class="habit-field">
           <label class="field-label" for="habit-end-date" data-label="End date (optional)"></label>
@@ -112,7 +112,8 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
 
   function updateDateBounds() {
     endDate.min = startDate.value || '0001-01-01';
-    startDate.max = endDate.value || '9999-12-31';
+    const today = getToday();
+    startDate.max = endDate.value && endDate.value < today ? endDate.value : today;
   }
 
   function syncHexColor() {
@@ -218,7 +219,7 @@ export function createHabitEditor({ getState, onChange, getToday = localDateKey 
       stageGoal: endDate.value ? stageGoal.value : '',
     };
     await applyChange(current => habitId === null
-      ? addHabit(current, values)
+      ? addHabit(current, values, undefined, getToday())
       : updateHabit(current, habitId, values, getToday()), t(habitId === null ? 'Habit added.' : 'Habit updated.'));
   });
 

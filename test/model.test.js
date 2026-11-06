@@ -42,6 +42,9 @@ test('calendar helpers keep local dates and Monday-to-Sunday weeks across a year
   assert.equal(formatWeekRange('2026-11-03'), 'Nov 2 – 8, 2026');
   assert.equal(formatWeekRange('2026-12-01'), 'Nov 30 – Dec 6, 2026');
   assert.equal(formatWeekRange('2027-01-01'), 'Dec 28, 2026 – Jan 3, 2027');
+  assert.equal(formatWeekRange('2026-11-03', 'zh-CN'), '2026/11/02 – 2026/11/08');
+  assert.equal(formatWeekRange('2026-03-03', 'zh-TW'), '2026/03/02 – 2026/03/08');
+  assert.equal(formatWeekRange('2027-01-01', 'zh-CN'), '2026/12/28 – 2027/01/03');
 });
 
 test('date parsing rejects rolled-over, malformed, and out-of-range dates', () => {
@@ -275,6 +278,33 @@ test('habit dates are required and descriptions survive edits and normalize line
   assert.throws(() => updateHabit(state, 'read', { ...values, description: 'bad\u0000text' }), /500 characters/);
 });
 
+test('start dates cannot be in the future and correcting an old future date restores check-ins', () => {
+  const today = '2026-11-06';
+  const values = { name: 'Calories', color: 'yellow', startDate: today, endDate: '2027-01-18' };
+  const state = addHabit(createInitialState(), values, 'calories', today);
+  const future = { ...values, startDate: '2026-11-07' };
+  const error = { name: 'RangeError', message: 'Choose a date on or before today.' };
+  assert.throws(() => addHabit(createInitialState(), future, 'calories', today), error);
+  assert.throws(() => updateHabit(state, 'calories', future, today), error);
+  const edited = updateHabit(state, 'calories', values, today);
+  assert.equal(edited.habits[0].startDate, today);
+  assert.equal(edited.habits[0].endDate, '2027-01-18');
+  assert.equal(isCompleted(toggleCompletion(edited, 'calories', today, today), 'calories', today), true);
+
+  const previous = frozen({
+    ...state,
+    habits: [{ ...state.habits[0], startDate: '2026-11-25' }],
+    completions: Object.fromEntries(['02', '03', '04', '05'].map(day => [`2026-11-${day}`, { calories: true }])),
+  });
+  assert.equal(validateState(previous), true);
+  assert.equal(isHabitActive(previous.habits[0], today), false);
+  const corrected = updateHabit(previous, 'calories', { ...values, startDate: '2026-11-02' }, today);
+  assert.equal(corrected.completions, previous.completions);
+  assert.equal(isHabitActive(corrected.habits[0], today), true);
+  const checked = toggleCompletion(corrected, 'calories', today, today);
+  assert.deepEqual(checked.completions, { ...previous.completions, [today]: { calories: true } });
+});
+
 test('start dates prevent retroactive missed weeks and check-ins while preserving existing records', () => {
   let state = addHabit(createInitialState(), { name: 'Read', color: 'blue', startDate: '2026-11-06', weeklyGoal: 2 }, 'read');
   const habit = state.habits[0];
@@ -285,7 +315,7 @@ test('start dates prevent retroactive missed weeks and check-ins while preservin
     { completed: 0, goal: 2, status: 'inactive' });
   state = toggleCompletion(state, 'read', '2026-11-06', '2026-11-09');
   assert.equal(isLateCompletion(state, 'read', '2026-11-06'), true);
-  const changed = updateHabit(state, 'read', { name: 'Read', color: 'blue', startDate: '2026-11-09' });
+  const changed = updateHabit(state, 'read', { name: 'Read', color: 'blue', startDate: '2026-11-09' }, '2026-11-09');
   assert.deepEqual(changed.completions, state.completions);
   assert.equal(validateState(changed), true);
   assert.deepEqual(weeklyProgress(changed, changed.habits[0], weekDates('2026-11-06'), '2026-11-09'),

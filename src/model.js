@@ -76,6 +76,10 @@ export function formatWeekRange(dateKey, locale = 'en-US') {
   const days = weekDates(dateKey);
   const start = parseDateKey(days[0]);
   const end = parseDateKey(days[6]);
+  if (locale.startsWith('zh')) {
+    const numericDate = new Intl.DateTimeFormat(locale, { month: '2-digit', day: '2-digit', year: 'numeric' });
+    return `${numericDate.format(start)} – ${numericDate.format(end)}`;
+  }
   if (locale !== 'en-US' && locale !== 'en') {
     return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', year: 'numeric' })
       .formatRange(start, end);
@@ -169,7 +173,7 @@ function requireHabit(state, habitId) {
   return habit;
 }
 
-function normalizeHabit(state, values, previous) {
+function normalizeHabit(state, values, previous, today = localDateKey()) {
   const name = typeof values?.name === 'string' ? values.name.trim() : '';
   if (!validName(name)) throw new TypeError('Use a habit name between 1 and 60 characters.');
   const color = typeof values.color === 'string' ? values.color.toLowerCase() : values.color;
@@ -182,6 +186,7 @@ function normalizeHabit(state, values, previous) {
   if (endDate !== '') parseDateKey(endDate);
   const startDate = values.startDate === undefined ? previous?.startDate : values.startDate;
   parseDateKey(startDate);
+  if (startDate > today) throw new RangeError('Choose a date on or before today.');
   if (endDate && endDate < startDate) throw new RangeError('End date must be on or after start date.');
   let description = values.description === undefined ? previous?.description ?? '' : values.description;
   if (typeof description === 'string') description = description.replace(/\r\n?/g, '\n').trim();
@@ -244,8 +249,8 @@ export function toggleCompletion(state, habitId, dateKey, today = localDateKey()
 const createHabitId = () => Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)),
   byte => byte.toString(16).padStart(2, '0')).join('');
 
-export function addHabit(state, values, id = createHabitId()) {
-  const habit = normalizeHabit(state, values);
+export function addHabit(state, values, id = createHabitId(), today = localDateKey()) {
+  const habit = normalizeHabit(state, values, undefined, today);
   if (!validId(id) || state.habits.some(item => item.id === id)) {
     throw new TypeError('The habit identifier is invalid or already exists.');
   }
@@ -256,7 +261,7 @@ export function addHabit(state, values, id = createHabitId()) {
 
 export function updateHabit(state, habitId, values, today = localDateKey()) {
   const previous = requireHabit(state, habitId);
-  const changes = normalizeHabit(state, values, previous);
+  const changes = normalizeHabit(state, values, previous, today);
   let weeklyGoals = previous.weeklyGoals;
   if (values.weeklyGoal !== undefined) {
     if (!validGoal(values.weeklyGoal)) throw new TypeError('Choose a weekly goal between 1 and 7 days.');
