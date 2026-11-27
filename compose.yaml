@@ -4,6 +4,8 @@ services:
     build: .
     environment:
       SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+      TRUSTED_PROXY_IPS: "${TRUSTED_PROXY_IPS:-}"
+      TZ: "${TZ:-Asia/Hong_Kong}"
     ports:
       - "${CIRGRID_BIND_ADDRESS:-127.0.0.1}:${CIRGRID_PORT:-4173}:8080"
     volumes:

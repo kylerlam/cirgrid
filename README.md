@@ -35,13 +35,15 @@ The default server binds to the loopback interface. Set `HOST`, `PORT`, or `DATA
 docker compose up --build -d
 ```
 
-Open **http://127.0.0.1:4173** and sign in using the initial account shown below the form. Compose stores SQLite and the export snapshot in the `cirgrid-data` volume. Set `CIRGRID_PORT` to change the host port. For an HTTPS reverse proxy, preserve the public Host header and set `SESSION_COOKIE_SECURE=true`. The default published address is loopback and can be changed with `CIRGRID_BIND_ADDRESS`.
+Open **http://127.0.0.1:4173** and sign in using the initial account shown below the form. Compose stores SQLite and the export snapshot in the `cirgrid-data` volume. Set `CIRGRID_PORT` to change the host port. For an HTTPS reverse proxy, preserve the public Host header and set `SESSION_COOKIE_SECURE=true`; this also sends HSTS. Every request then arrives from the proxy's address, so set `TRUSTED_PROXY_IPS` (comma-separated) to the proxy address: sign-in attempts from those peers are counted by the visitor address in Cloudflare's `CF-Connecting-IP` header, and other clients cannot change their counted address that way. `TZ` (default `Asia/Hong_Kong`) sets the date used in export file names. The default published address is loopback and can be changed with `CIRGRID_BIND_ADDRESS`.
 
 ## Bring over browser records
 
 Open the new CirGrid at the same hostname, port, and protocol as the previous version, using the same browser profile. After signing in, select **Import browser records** when the tracker detects the old data. The original browser copy is retained. For a different destination URL, use **Download browser backup** at the old origin and import that JSON file at the new destination.
 
 ## Data and backups
+
+Each check-in is saved on its own (`POST /api/checkin` with the habit, date and status), so tapping a day does not upload the whole history. Creating, editing, reordering or deleting habits saves the complete tracker with a revision check.
 
 Use **Settings → Data** to download YAML or JSON, or import a CirGrid backup. Exports contain habits, descriptions, start dates, weekly targets, and check-ins. They exclude credentials and sessions. Export also refreshes the server-side `cirgrid.yml` snapshot. The primary database is `data/cirgrid.sqlite3` for a local run, or `/app/data/cirgrid.sqlite3` in Docker.
 

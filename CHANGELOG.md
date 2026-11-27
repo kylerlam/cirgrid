@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-11-27
+
+- Save each check-in on its own through `POST /api/checkin`, instead of uploading every habit and the whole check-in history on each tap. Habit edits still save the full tracker.
+- Count sign-in attempts by the visitor address that Cloudflare reports in `CF-Connecting-IP`, but only for requests from the reverse proxies listed in `TRUSTED_PROXY_IPS`. Previously every visitor behind the proxy shared one limit, so failed attempts by anyone could lock out the owner for a few minutes.
+- Add `?v=<version>` to script and stylesheet URLs so browsers and Cloudflare cannot mix files from two releases.
+- Send `X-Frame-Options: DENY`, and HSTS when secure cookies are enabled.
+- Name export files with the Hong Kong date (or the `TZ` setting) rather than the container clock.
+
 ## 1.2.2 — 2026-11-06
 
 - Limit new and edited habit start dates to today or earlier, while allowing future end dates and preserving existing check-ins.
