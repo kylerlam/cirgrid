@@ -67,9 +67,38 @@ async function write(transform) {
   }
 }
 
+// A check-in sends only that habit and date, so saving stays small however long the history grows.
+async function writeCheckIn(habitId, dateKey, completed, today) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (isCompleted(state, habitId, dateKey) === completed) return state;
+    const status = toggleCompletion(state, habitId, dateKey, today).completions[dateKey]?.[habitId] ?? null;
+    try {
+      const saved = await request('/api/checkin', { method: 'POST', data: { habitId, date: dateKey, status } });
+      if (saved.revision === revision + 1) {
+        const completions = { ...state.completions };
+        if (Object.keys(saved.records).length) completions[saved.date] = saved.records;
+        else delete completions[saved.date];
+        accept({ state: { ...state, completions }, revision: saved.revision });
+      } else {
+        accept(await request('/api/state'));
+      }
+      changes?.postMessage(revision);
+      return state;
+    } catch (error) {
+      if (error.status !== 409 || attempt === 1) throw error;
+      accept(await request('/api/state'));
+    }
+  }
+  return state;
+}
+
 async function applyChange(transform, message) {
+  return applyWrite(() => write(transform), message);
+}
+
+async function applyWrite(task, message) {
   try {
-    const next = await serialize(() => write(transform));
+    const next = await serialize(task);
     elements.status.textContent = typeof message === 'function' ? message(next) : t(message);
     return true;
   } catch (error) {
@@ -91,8 +120,7 @@ const habitOrder = createHabitReorder(elements['habit-list'], {
 function toggle(habitId, dateKey) {
   const completed = !isCompleted(state, habitId, dateKey);
   const today = localDateKey();
-  return applyChange(current => isCompleted(current, habitId, dateKey) === completed
-    ? current : toggleCompletion(current, habitId, dateKey, today), next => {
+  return applyWrite(() => writeCheckIn(habitId, dateKey, completed, today), next => {
     const habit = next.habits.find(item => item.id === habitId);
     if (!habit) return t('This habit no longer exists.');
     return t(completed ? '{0} checked in for {1}.' : '{0} check-in removed for {1}.', habit.name, dateKey);

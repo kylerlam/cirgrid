@@ -2,11 +2,12 @@
 
 from collections import defaultdict
 from contextlib import closing
-from datetime import date
+from datetime import date, datetime
 from hashlib import pbkdf2_hmac, sha256
 from hmac import compare_digest
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import ipaddress
 import json
 import mimetypes
 import os
@@ -18,17 +19,53 @@ import tempfile
 import threading
 import time
 from urllib.parse import parse_qs, unquote, urlsplit
+from zoneinfo import ZoneInfo
 
-from cirgrid_data import DECODER, MAX_IMPORT_BYTES, MAX_STATE_BYTES, dump_yaml, migrate_state, read_backup, validate_state
+from cirgrid_data import (DECODER, MAX_IMPORT_BYTES, MAX_STATE_BYTES, dump_yaml, migrate_state, read_backup,
+                          tracker_date, validate_state)
 
 
 ROOT = Path(__file__).resolve().parent
+APP_VERSION = "1.3.0"
 COOKIE = "cirgrid_session"
 DEFAULT_USERNAME = "admin"
 DEFAULT_PASSWORD = "admin123"
 SESSION_SECONDS = 30 * 24 * 60 * 60
 LOGIN_WINDOW = 300
 LOGIN_ATTEMPTS = 10
+ASSET_REFERENCE = re.compile(r"""((?:src|href)=["'])(/(?:src|assets)/[^"'?#]+\.(?:js|css))(["'])""")
+MODULE_IMPORT = re.compile(r"""(\b(?:from|import)\s*["']\./[^"'?#]+\.js)(["'])""")
+
+
+def versioned_assets(content, suffix):
+    """Tag same-origin asset URLs with the release so edge and browser caches cannot mix versions."""
+    if suffix not in (".html", ".js"):
+        return content
+    text = content.decode("utf-8")
+    if suffix == ".html":
+        text = ASSET_REFERENCE.sub(rf"\g<1>\g<2>?v={APP_VERSION}\g<3>", text)
+    text = MODULE_IMPORT.sub(rf"\g<1>?v={APP_VERSION}\g<2>", text)
+    return text.encode("utf-8")
+
+
+def trusted_proxies(value=None):
+    """Parse TRUSTED_PROXY_IPS: peers allowed to report the visitor address in CF-Connecting-IP."""
+    value = os.environ.get("TRUSTED_PROXY_IPS", "") if value is None else value
+    return frozenset(str(ipaddress.ip_address(item.strip())) for item in value.split(",") if item.strip())
+
+
+def client_ip(peer, headers, proxies):
+    """Use Cloudflare's visitor address only when the direct peer is a configured reverse proxy."""
+    if peer in proxies:
+        try:
+            return str(ipaddress.ip_address(headers.get("CF-Connecting-IP", "").strip()))
+        except ValueError:
+            pass
+    return peer
+
+
+def local_today():
+    return datetime.now(ZoneInfo(os.environ.get("TZ") or "Asia/Hong_Kong")).date()
 
 
 class RequestError(Exception):
@@ -206,6 +243,41 @@ class Store:
                 raise RequestError("STATE_CONFLICT", "Data changed on another device. Try again.", 409)
         return {"state": state, "revision": revision + 1}
 
+    def check_in(self, data):
+        """Set or clear one check-in without sending the whole tracker."""
+        if data.keys() != {"habitId", "date", "status"}:
+            raise RequestError("INVALID_CHECKIN", "Send a habit, date and status.")
+        habit_id, day, status = data["habitId"], data["date"], data["status"]
+        try:
+            tracker_date(day)
+        except ValueError:
+            raise RequestError("INVALID_CHECKIN", "The date is invalid.") from None
+        if not isinstance(habit_id, str) or not (status is None or status is True or status == "late"):
+            raise RequestError("INVALID_CHECKIN", "The check-in is invalid.")
+        with closing(self.connect()) as db, db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT revision, state FROM tracker WHERE id = 1").fetchone()
+            state = json.loads(row[1]) if row else None
+            habit = next((item for item in (state or {}).get("habits", []) if item["id"] == habit_id), None)
+            if habit is None:
+                raise RequestError("STATE_CONFLICT", "This habit no longer exists.", 409)
+            records = dict(state["completions"].get(day, {}))
+            if status is None:
+                records.pop(habit_id, None)
+            else:
+                if day < habit["startDate"] or (habit["endDate"] and day > habit["endDate"]):
+                    raise RequestError("STATE_CONFLICT", "This habit is not active on that date.", 409)
+                records[habit_id] = status
+            if records:
+                state["completions"][day] = records
+            else:
+                state["completions"].pop(day, None)
+            encoded = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
+            if len(encoded.encode()) > MAX_STATE_BYTES:
+                raise RequestError("STATE_TOO_LARGE", "The tracker has exceeded its storage limit.", 413)
+            db.execute("UPDATE tracker SET revision = revision + 1, state = ? WHERE id = 1", (encoded,))
+            return {"revision": row[0] + 1, "date": day, "records": records}
+
     def export(self, file_format):
         with self.export_lock:
             state = self.read_state()["state"]
@@ -234,7 +306,8 @@ def session_data(username=None):
     return value
 
 
-def make_server(host, port, store, *, secure_cookie=False):
+def make_server(host, port, store, *, secure_cookie=False, proxies=None):
+    proxies = trusted_proxies() if proxies is None else frozenset(proxies)
     attempts = defaultdict(int)
     attempts_lock = threading.Lock()
     window = None
@@ -250,7 +323,10 @@ def make_server(host, port, store, *, secure_cookie=False):
             self.send_header("Content-Length", str(len(content)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("X-Frame-Options", "DENY")
             self.send_header("Referrer-Policy", "same-origin")
+            if secure_cookie:
+                self.send_header("Strict-Transport-Security", "max-age=31536000")
             self.send_header("Content-Security-Policy",
                              "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
                              "base-uri 'none'; frame-ancestors 'none'; form-action 'self'")
@@ -322,7 +398,7 @@ def make_server(host, port, store, *, secure_cookie=False):
         def limit_sign_in(self):
             nonlocal window
             now = int(time.monotonic()) // LOGIN_WINDOW
-            client = self.client_address[0]
+            client = client_ip(self.client_address[0], self.headers, proxies)
             with attempts_lock:
                 if now != window:
                     attempts.clear()
@@ -358,6 +434,8 @@ def make_server(host, port, store, *, secure_cookie=False):
                 return self.json(store.read_state())
             if method == "PUT" and path == "/api/state":
                 return self.json(store.save_state(self.body(MAX_IMPORT_BYTES)))
+            if method == "POST" and path == "/api/checkin":
+                return self.json(store.check_in(self.body()))
             if method == "POST" and path == "/api/account":
                 user, new_token = store.change_account(token, self.body())
                 return self.json(session_data(user), Set_Cookie=self.set_cookie(new_token))
@@ -393,7 +471,7 @@ def make_server(host, port, store, *, secure_cookie=False):
             extension = "json" if file_format == "json" else "yml"
             content_type = "application/json" if extension == "json" else "application/yaml"
             return self.reply(store.export(file_format), content_type + "; charset=utf-8",
-                              Content_Disposition=f'attachment; filename="cirgrid-{date.today()}.{extension}"')
+                              Content_Disposition=f'attachment; filename="cirgrid-{local_today()}.{extension}"')
 
         def static(self, path, username):
             if path in ("/", "/index.html", "/login", "/login.html"):
@@ -419,7 +497,7 @@ def make_server(host, port, store, *, secure_cookie=False):
             kind = mimetypes.guess_type(target)[0] or "application/octet-stream"
             if kind.startswith("text/") or kind in ("application/javascript", "image/svg+xml"):
                 kind += "; charset=utf-8"
-            return self.reply(target.read_bytes(), kind)
+            return self.reply(versioned_assets(target.read_bytes(), target.suffix), kind)
 
         def handle_request(self):
             try:
