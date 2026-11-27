@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from cirgrid_data import migrate_state
-from server import APP_VERSION, Store, make_server, password_hash
+from server import APP_VERSION, Store, client_ip, make_server, password_hash
 
 
 STATE = {
@@ -280,13 +280,27 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(self.request("POST", "/api/checkin", {"habitId": "reading", "date": "2026-11-04", "status": True})[0], 401)
         self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2]["revision"], 3)
 
+    def test_client_ip_trusts_cloudflare_header_only_from_cloudflare_edges(self):
+        proxies = frozenset({"192.168.1.123"})
+        cases = [
+            ("192.168.1.123", {"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"}, "203.0.113.9"),
+            ("192.168.1.123", {"X-Real-IP": "2606:4700::1", "CF-Connecting-IP": "2001:db8::5"}, "2001:db8::5"),
+            ("192.168.1.123", {"X-Real-IP": "162.158.1.1"}, "162.158.1.1"),
+            ("192.168.1.123", {"X-Real-IP": "198.51.100.7", "CF-Connecting-IP": "203.0.113.9"}, "198.51.100.7"),
+            ("192.168.1.123", {"CF-Connecting-IP": "203.0.113.9"}, "192.168.1.123"),
+            ("198.51.100.7", {"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"}, "198.51.100.7"),
+        ]
+        for peer, headers, expected in cases:
+            with self.subTest(peer=peer, headers=headers):
+                self.assertEqual(client_ip(peer, headers, proxies), expected)
+
     def test_login_limit_uses_cloudflare_address_only_behind_trusted_proxy(self):
         self.start(proxies={"127.0.0.1"})
         wrong = {"username": "admin", "password": "wrong"}
         for _ in range(10):
-            self.assertEqual(self.request("POST", "/api/login", wrong, headers={"CF-Connecting-IP": "203.0.113.9"})[0], 401)
-        self.assertEqual(self.request("POST", "/api/login", wrong, headers={"CF-Connecting-IP": "203.0.113.9"})[0], 429)
-        self.assertEqual(self.request("POST", "/api/login", ACCOUNT, headers={"CF-Connecting-IP": "198.51.100.4"})[0], 200)
+            self.assertEqual(self.request("POST", "/api/login", wrong, headers={"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"})[0], 401)
+        self.assertEqual(self.request("POST", "/api/login", wrong, headers={"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"})[0], 429)
+        self.assertEqual(self.request("POST", "/api/login", ACCOUNT, headers={"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "198.51.100.4"})[0], 200)
 
     def test_headers_versioned_assets_and_hong_kong_export_date(self):
         status, headers, _ = self.request("GET", "/login")

@@ -54,14 +54,40 @@ def trusted_proxies(value=None):
     return frozenset(str(ipaddress.ip_address(item.strip())) for item in value.split(",") if item.strip())
 
 
+# Cloudflare edge networks, from https://www.cloudflare.com/ips-v4 and /ips-v6 (checked 2026-11-27).
+CLOUDFLARE_NETWORKS = tuple(ipaddress.ip_network(network) for network in (
+    "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18",
+    "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17",
+    "162.158.0.0/15", "104.16.0.0/13", "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22",
+    "2400:cb00::/32", "2606:4700::/32", "2803:f800::/32", "2405:b500::/32", "2405:8100::/32",
+    "2a06:98c0::/29", "2c0f:f248::/32",
+))
+
+
+def header_ip(headers, name):
+    try:
+        return ipaddress.ip_address(headers.get(name, "").strip())
+    except ValueError:
+        return None
+
+
 def client_ip(peer, headers, proxies):
-    """Use Cloudflare's visitor address only when the direct peer is a configured reverse proxy."""
-    if peer in proxies:
-        try:
-            return str(ipaddress.ip_address(headers.get("CF-Connecting-IP", "").strip()))
-        except ValueError:
-            pass
-    return peer
+    """Return the address to rate-limit.
+
+    Behind a trusted reverse proxy every request comes from the proxy, which puts the real TCP
+    peer in X-Real-IP. When that peer is a Cloudflare edge, CF-Connecting-IP holds the visitor.
+    A client that reaches the proxy without Cloudflare is counted by its own address, so it cannot
+    pick a new identity by sending its own CF-Connecting-IP header.
+    """
+    if peer not in proxies:
+        return peer
+    edge = header_ip(headers, "X-Real-IP")
+    if edge is None:
+        return peer
+    if any(edge in network for network in CLOUDFLARE_NETWORKS):
+        visitor = header_ip(headers, "CF-Connecting-IP")
+        return str(visitor or edge)
+    return str(edge)
 
 
 def local_today():
