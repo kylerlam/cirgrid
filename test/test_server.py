@@ -11,9 +11,10 @@ import sqlite3
 from tempfile import TemporaryDirectory
 from threading import Thread
 import unittest
+from unittest.mock import patch
 
 from cirgrid_data import migrate_state
-from server import Store, make_server, password_hash
+from server import APP_VERSION, Store, client_ip, make_server, password_hash
 
 
 STATE = {
@@ -36,8 +37,8 @@ class ServerTest(unittest.TestCase):
         self.directory = Path(directory.name)
         self.start()
 
-    def start(self):
-        server = make_server("127.0.0.1", 0, Store(self.directory))
+    def start(self, **options):
+        server = make_server("127.0.0.1", 0, Store(self.directory), **options)
         self.addCleanup(server.server_close)
         worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01})
         worker.start()
@@ -246,6 +247,89 @@ class ServerTest(unittest.TestCase):
         del missing["habits"][0]["startDate"]
         self.assertEqual(self.request("PUT", "/api/state", {"state": missing, "revision": 1}, cookie=cookie)[0], 400)
         self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2], {"state": STATE, "revision": 1})
+
+    def test_check_in_saves_one_record_and_keeps_other_history(self):
+        cookie = self.login()
+        self.assertEqual(self.request("POST", "/api/checkin", {"habitId": "reading", "date": "2026-11-03", "status": True},
+                                      cookie=cookie)[0], 409)
+        self.assertEqual(self.request("PUT", "/api/state", {"state": STATE, "revision": 0}, cookie=cookie)[0], 200)
+        status, _, body = self.request("POST", "/api/checkin", {"habitId": "reading", "date": "2026-11-03", "status": True},
+                                       cookie=cookie)
+        self.assertEqual((status, body), (200, {"revision": 2, "date": "2026-11-03", "records": {"reading": True}}))
+        status, _, body = self.request("POST", "/api/checkin", {"habitId": "reading", "date": "2026-11-01", "status": None},
+                                       cookie=cookie)
+        self.assertEqual((status, body), (200, {"revision": 3, "date": "2026-11-01", "records": {}}))
+        saved = self.request("GET", "/api/state", cookie=cookie)[2]
+        self.assertEqual(saved["revision"], 3)
+        self.assertEqual(saved["state"]["completions"], {"2026-11-03": {"reading": True}})
+        self.assertEqual(saved["state"]["habits"], STATE["habits"])
+        for invalid in ({"habitId": "reading", "date": "2026-11-31", "status": True},
+                        {"habitId": "reading", "date": "2026-11-04", "status": False},
+                        {"habitId": "reading", "date": "2026-11-04", "status": 1},
+                        {"habitId": "reading", "date": "2026-11-04"},
+                        {"habitId": 7, "date": "2026-11-04", "status": True}):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(self.request("POST", "/api/checkin", invalid, cookie=cookie)[0], 400)
+        for inactive in ("2026-10-31", "2027-01-01"):
+            self.assertEqual(self.request("POST", "/api/checkin", {"habitId": "reading", "date": inactive, "status": True},
+                                          cookie=cookie)[0], 409)
+        self.assertEqual(self.request("POST", "/api/checkin", {"habitId": "gone", "date": "2026-11-04", "status": True},
+                                      cookie=cookie)[0], 409)
+        self.assertEqual(self.request("POST", "/api/checkin", {"habitId": "reading", "date": "2026-11-04", "status": True},
+                                      cookie=cookie, headers={"Origin": "https://evil.example"})[0], 403)
+        self.assertEqual(self.request("POST", "/api/checkin", {"habitId": "reading", "date": "2026-11-04", "status": True})[0], 401)
+        self.assertEqual(self.request("GET", "/api/state", cookie=cookie)[2]["revision"], 3)
+
+    def test_client_ip_trusts_cloudflare_header_only_from_cloudflare_edges(self):
+        proxies = frozenset({"192.168.1.123"})
+        cases = [
+            ("192.168.1.123", {"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"}, "203.0.113.9"),
+            ("192.168.1.123", {"X-Real-IP": "2606:4700::1", "CF-Connecting-IP": "2001:db8::5"}, "2001:db8::5"),
+            ("192.168.1.123", {"X-Real-IP": "162.158.1.1"}, "162.158.1.1"),
+            ("192.168.1.123", {"X-Real-IP": "198.51.100.7", "CF-Connecting-IP": "203.0.113.9"}, "198.51.100.7"),
+            ("192.168.1.123", {"CF-Connecting-IP": "203.0.113.9"}, "192.168.1.123"),
+            ("198.51.100.7", {"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"}, "198.51.100.7"),
+        ]
+        for peer, headers, expected in cases:
+            with self.subTest(peer=peer, headers=headers):
+                self.assertEqual(client_ip(peer, headers, proxies), expected)
+
+    def test_login_limit_uses_cloudflare_address_only_behind_trusted_proxy(self):
+        self.start(proxies={"127.0.0.1"})
+        wrong = {"username": "admin", "password": "wrong"}
+        for _ in range(10):
+            self.assertEqual(self.request("POST", "/api/login", wrong, headers={"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"})[0], 401)
+        self.assertEqual(self.request("POST", "/api/login", wrong, headers={"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "203.0.113.9"})[0], 429)
+        self.assertEqual(self.request("POST", "/api/login", ACCOUNT, headers={"X-Real-IP": "162.158.1.1", "CF-Connecting-IP": "198.51.100.4"})[0], 200)
+
+    def test_headers_versioned_assets_and_hong_kong_export_date(self):
+        status, headers, _ = self.request("GET", "/login")
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["X-Frame-Options"], "DENY")
+        self.assertIsNone(headers["Strict-Transport-Security"])
+        cookie = self.login()
+        status, _, page = self.request("GET", "/", cookie=cookie)
+        self.assertIn(f'src="/src/app.js?v={APP_VERSION}"'.encode(), page)
+        self.assertIn(f'href="/src/styles.css?v={APP_VERSION}"'.encode(), page)
+        status, _, script = self.request("GET", f"/src/app.js?v={APP_VERSION}", cookie=cookie)
+        self.assertEqual(status, 200)
+        self.assertIn(f"from './model.js?v={APP_VERSION}'".encode(), script)
+        with patch.dict("os.environ", {"TZ": "Asia/Hong_Kong"}), patch("server.datetime") as clock:
+            clock.now.return_value.date.return_value = date(2026, 11, 28)
+            headers = self.request("GET", "/api/export", cookie=cookie)[1]
+        self.assertIn('filename="cirgrid-2026-11-28.yml"', headers["Content-Disposition"])
+        clock.now.assert_called_once()
+        self.assertEqual(str(clock.now.call_args.args[0]), "Asia/Hong_Kong")
+
+    def test_https_deployment_sends_hsts(self):
+        self.start(secure_cookie=True)
+        status, headers, _ = self.request("GET", "/api/health")
+        self.assertEqual((status, headers["Strict-Transport-Security"]), (200, "max-age=31536000"))
+
+    def test_version_matches_page_and_package(self):
+        root = Path(__file__).resolve().parent.parent
+        self.assertIn(f'<span class="app-version">v{APP_VERSION}</span>', (root / "index.html").read_text())
+        self.assertEqual(json.loads((root / "package.json").read_text())["version"], APP_VERSION)
 
 
 if __name__ == "__main__":
